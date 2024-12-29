@@ -1,17 +1,16 @@
 #include "arena/arena_manager.h"
-#include "games/tic_tac_toe/tic_tac_toe.h"
 #include "common/logger.h"
 #include <cmath>
 
 MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
                                  std::shared_ptr<Agent> player2,
+                                 std::shared_ptr<State> initial_state,
                                  bool record_history) {
     MatchResult result;
-    auto state = std::make_shared<TicTacToeState>();
+    auto state = std::shared_ptr<State>(initial_state->Clone());
     std::shared_ptr<Agent> current_player = player1;
     
     while (!state->IsTerminal()) {
-        // Record state if needed
         if (record_history) {
             result.game_history.emplace_back(
                 std::shared_ptr<State>(state->Clone()), 
@@ -19,19 +18,13 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
             );
         }
         
-        // Get and apply action
         int action = current_player->GetAction(state);
         state->ApplyAction(action);
-        
-        // Switch players
         current_player = (current_player == player1) ? player2 : player1;
     }
     
-    // Determine winner
     double final_value = state->Evaluate();
     result.winner = (final_value > 0) ? 1 : (final_value < 0) ? -1 : 0;
-    
-    // Update ELO ratings
     UpdateRatings(result);
     
     return result;

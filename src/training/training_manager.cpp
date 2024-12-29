@@ -3,13 +3,13 @@
 #include <filesystem>
 #include <algorithm>
 
-TrainingManager::TrainingManager(const TrainingConfig& config)
-    : config_(config) {
-    // Create checkpoint directory if it doesn't exist
+TrainingManager::TrainingManager(const TrainingConfig& config,
+                               std::shared_ptr<State> initial_state,
+                               std::shared_ptr<ValuePolicyNetwork> network)
+    : config_(config),
+      initial_state_(initial_state) {
     std::filesystem::create_directories(config.checkpoint_dir);
     
-    // Initialize agents with same network architecture
-    auto network = std::make_shared<TicTacToeNetwork>();
     best_agent_ = std::make_shared<MCTSAgent>(network);
     training_agent_ = std::make_shared<MCTSAgent>(network->clone());
 }
@@ -18,9 +18,9 @@ void TrainingManager::RunTrainingIteration() {
     Logger::Log(LogLevel::INFO, "Starting self-play phase");
     self_play_buffer_.clear();
     
-    // Generate self-play games
     for (int game = 0; game < config_.num_self_play_games; ++game) {
-        auto result = arena_.PlayGame(training_agent_, training_agent_, true);
+        auto result = arena_.PlayGame(training_agent_, training_agent_, 
+                                    initial_state_, true);
         self_play_buffer_.insert(
             self_play_buffer_.end(),
             result.game_history.begin(),
@@ -31,10 +31,8 @@ void TrainingManager::RunTrainingIteration() {
     Logger::Log(LogLevel::INFO, "Training network on " + 
         std::to_string(self_play_buffer_.size()) + " positions");
     
-    // Train network on collected data
     training_agent_->TrainOnBuffer(self_play_buffer_);
     
-    // Evaluate if new network is better
     if (EvaluateNewNetwork()) {
         Logger::Log(LogLevel::INFO, "New network accepted as best");
         SaveCheckpoint(config_.checkpoint_dir + "/best_network.pt");
