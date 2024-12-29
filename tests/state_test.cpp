@@ -1,6 +1,6 @@
 #include <iostream>
-#include "games/tic_tac_toe.h"
-
+#include "games/tic_tac_toe/tic_tac_toe.h"
+#include "common/logger.h"
 int main() {
     TicTacToeState state;
 
@@ -17,17 +17,17 @@ int main() {
     state.ApplyAction(3);  // X moves
 
     // Test valid actions after some moves
-    std::cout << "Valid actions after moves: ";
+    Logger::Log(LogLevel::INFO, "Valid actions after moves: ");
     for (int action : state.GetValidActions()) {
-        std::cout << action << " ";
+        Logger::Log(LogLevel::INFO, std::to_string(action) + " ");
     }
     std::cout << std::endl;
 
     // Check if the game is terminal
-    std::cout << "Is terminal: " << state.IsTerminal() << std::endl;
+    Logger::Log(LogLevel::INFO, "Is terminal: " + std::to_string(state.IsTerminal()));
 
     // Evaluate the current state
-    std::cout << "State evaluation: " << state.Evaluate() << std::endl;
+    Logger::Log(LogLevel::INFO, "State evaluation: " + std::to_string(state.Evaluate()));
 
     return 0;
 }

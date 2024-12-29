@@ -2,25 +2,26 @@
 
 #include "mcts.h"
 #include "common/state.h"
-
+#include "common/logger.h"
 #include <cmath>
 #include <limits>
 #include <random>
 
 namespace {
 
-// Exploration parameter for Upper Confidence Bounds for Trees (UCT).
-constexpr double kExplorationConstant = 1.414;  // sqrt(2)
-
-// Random number generation for simulation phase.
+constexpr double kExplorationConstant = std::sqrt(2); 
 std::random_device kRandomDevice;
 std::mt19937 kGenerator(kRandomDevice());
 
-}  // namespace
+} 
 
 MCTS::MCTS(int simulation_count, StateFactory state_factory)
     : simulation_count_(simulation_count) {
-    root_ = std::make_shared<Node>(std::weak_ptr<Node>(), 0, -1, state_factory());
+    std::weak_ptr<Node> parent;
+    int player_to_move = 0;
+    int action = NO_ACTION;
+    auto initial_state = state_factory();
+    root_ = std::make_shared<Node>(parent, player_to_move, action, std::move(initial_state));
 }
 
 std::shared_ptr<Node> MCTS::Select(std::shared_ptr<Node> node) {
@@ -48,7 +49,7 @@ std::shared_ptr<Node> MCTS::SelectBestChild(std::shared_ptr<Node> node) {
 double MCTS::CalculateUCT(std::shared_ptr<Node> node) {
   auto parent = node->GetParent().lock();
   if (!parent) {
-    // Handle the case where the parent no longer exists
+    Logger::Log(LogLevel::DEBUG, "Parent is null");
     return 0.0;
   }
 
@@ -63,11 +64,14 @@ double MCTS::CalculateUCT(std::shared_ptr<Node> node) {
   const double exploration = kExplorationConstant * 
       std::sqrt(std::log(parent_visits) / child_visits);
 
+  //Logger::Log(LogLevel::DEBUG, "UCT value: " + std::to_string(exploration + exploitation));
   return exploitation + exploration;
 }
 
 std::vector<int> MCTS::GetValidActions(std::shared_ptr<Node> node) {
-  return node->GetState()->GetValidActions();
+  auto valid_actions = node->GetState()->GetValidActions();
+  //Logger::Log(LogLevel::DEBUG, "Valid actions: " + std::to_string(valid_actions.size()));
+  return valid_actions;
 }
 
 std::shared_ptr<Node> MCTS::Expand(std::shared_ptr<Node> node) {
@@ -95,7 +99,9 @@ double MCTS::Simulate(const std::shared_ptr<Node>& node) {
   // Perform random moves until a terminal state is reached
   while (!state->IsTerminal()) {
     std::vector<int> valid_actions = state->GetValidActions();
+    //Logger::Log(LogLevel::DEBUG, "Valid actions: " + std::to_string(valid_actions.size()));
     int random_action = valid_actions[kGenerator() % valid_actions.size()];
+    //Logger::Log(LogLevel::DEBUG, "Random action: " + std::to_string(random_action));
     state->ApplyAction(random_action);
   }
 
@@ -107,6 +113,8 @@ void MCTS::Backpropagate(const std::shared_ptr<Node>& node, double value) {
   std::shared_ptr<Node> current = node;
   while (current) {
     current->AddValue(value);
+    Logger::Log(LogLevel::DEBUG, "Backpropagating at node with action: " + std::to_string(current->GetAction()) +
+                            ", New visit count: " + std::to_string(current->GetVisitCount()));
     current = current->GetParent().lock();
   }
 }
@@ -128,7 +136,7 @@ void MCTS::Search() {
 }
 
 int MCTS::GetBestAction() {
-  int best_action = -1;
+  int best_action = NO_ACTION;
   int max_visits = -1;
   for (const auto& child : root_->GetChildren()) {
     if (child->GetVisitCount() > max_visits) {

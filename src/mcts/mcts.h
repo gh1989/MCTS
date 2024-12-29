@@ -2,6 +2,7 @@
 #define MCTS_H_
 
 #include "common/state.h"
+#include "common/logger.h"
 
 #include <vector>
 #include <cmath>
@@ -9,6 +10,8 @@
 #include <memory>
 #include <unordered_map>
 #include <functional>
+
+constexpr int NO_ACTION = -1;
 
 // Represents a node in the Monte Carlo Tree Search tree. Each node maintains
 // parent-child relationships and tracks which player's turn it is.
@@ -53,6 +56,28 @@ class Node : public std::enable_shared_from_this<Node> {
   int GetVisitCount() const { return visit_count_; }
   double GetTotalValue() const { return total_value_; }
   std::vector<int> GetValidActions() const;
+
+  // Function to print the tree structure
+  void PrintTree(const std::shared_ptr<Node>& node, const std::string& prefix = "", bool is_last = true) {
+    if (!node) return;
+
+    // Print the current node
+    std::cout << prefix;
+    std::cout << (is_last ? "└── " : "├── ");
+    std::cout << "Action: " << node->GetAction()
+              << ", Visits: " << node->GetVisitCount()
+              << ", Total Value: " << node->GetTotalValue() << std::endl;
+
+    // Prepare the prefix for the children
+    std::string child_prefix = prefix + (is_last ? "    " : "│   ");
+
+    // Recursively print each child
+    const auto& children = node->GetChildren();
+    for (size_t i = 0; i < children.size(); ++i) {
+      PrintTree(children[i], child_prefix, i == children.size() - 1);
+    }
+  }
+
 
  private:
   // Child nodes representing possible next states.
@@ -124,6 +149,9 @@ class MCTS {
   int simulation_count_;
 
   std::shared_ptr<Node> SelectBestChild(std::shared_ptr<Node> node);
+
+  // Add a friend declaration for the test function
+  friend void TestSingleSimulation();
 };
 
 #endif  // MCTS_H_

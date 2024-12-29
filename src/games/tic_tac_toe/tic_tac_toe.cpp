@@ -1,4 +1,5 @@
-#include "games/tic_tac_toe.h"
+#include "games/tic_tac_toe/tic_tac_toe.h"
+#include "common/logger.h"
 #include <iostream> 
 
 TicTacToeState::TicTacToeState() : board_({0}), current_player_(1) {}
@@ -10,6 +11,7 @@ std::vector<int> TicTacToeState::GetValidActions() const {
       actions.push_back(i);
     }
   }
+  //Logger::Log(LogLevel::DEBUG, "Valid actions: " + std::to_string(actions.size()));
   return actions;
 }
 
@@ -45,11 +47,14 @@ bool TicTacToeState::CheckWin(int player) const {
 }
 
 void TicTacToeState::Print() const {
+  std::string board_representation = "Current TicTacToe state:\n";
   for (int i = 0; i < board_.size(); ++i) {
     char symbol = board_[i] == 1 ? 'X' : (board_[i] == -1 ? 'O' : '.');
-    std::cout << symbol << " ";
+    board_representation += symbol;
+    board_representation += " ";
     if ((i + 1) % 3 == 0) {
-      std::cout << std::endl;
+      board_representation += "\n";
     }
   }
+  Logger::Log(LogLevel::INFO, board_representation);
 }
