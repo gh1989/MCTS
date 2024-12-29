@@ -17,17 +17,17 @@ int main() {
     state.ApplyAction(3);  // X moves
 
     // Test valid actions after some moves
-    Logger::Log(LogLevel::INFO, "Valid actions after moves: ");
+    Logger::Log(LogLevel::TEST, "Valid actions after moves: ");
     for (int action : state.GetValidActions()) {
         Logger::Log(LogLevel::INFO, std::to_string(action) + " ");
     }
     std::cout << std::endl;
 
     // Check if the game is terminal
-    Logger::Log(LogLevel::INFO, "Is terminal: " + std::to_string(state.IsTerminal()));
+    Logger::Log(LogLevel::TEST, "Is terminal: " + std::to_string(state.IsTerminal()));
 
     // Evaluate the current state
-    Logger::Log(LogLevel::INFO, "State evaluation: " + std::to_string(state.Evaluate()));
+    Logger::Log(LogLevel::TEST, "State evaluation: " + std::to_string(state.Evaluate()));
 
     return 0;
 }

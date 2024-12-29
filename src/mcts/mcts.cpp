@@ -25,11 +25,34 @@ MCTS::MCTS(int simulation_count, StateFactory state_factory)
 }
 
 std::shared_ptr<Node> MCTS::Select(std::shared_ptr<Node> node) {
-  std::shared_ptr<Node> current = node;
-  while (!IsTerminal(current) && !current->GetChildren().empty()) {
-    current = SelectBestChild(current);
-  }
-  return current;
+    std::shared_ptr<Node> current = node;
+    while (!IsTerminal(current)) {
+        std::vector<int> valid_actions = GetValidActions(current);
+        bool has_unexplored_actions = false;
+        
+        // Check if there are any unexplored actions
+        for (int action : valid_actions) {
+            bool action_explored = false;
+            for (const auto& child : current->GetChildren()) {
+                if (child->GetAction() == action) {
+                    action_explored = true;
+                    break;
+                }
+            }
+            if (!action_explored) {
+                has_unexplored_actions = true;
+                break;
+            }
+        }
+        
+        // If all actions are explored and we have children, select best child
+        if (!has_unexplored_actions && !current->GetChildren().empty()) {
+            current = SelectBestChild(current);
+        } else {
+            break;  // Found a node to expand
+        }
+    }
+    return current;
 }
 
 std::shared_ptr<Node> MCTS::SelectBestChild(std::shared_ptr<Node> node) {
@@ -64,13 +87,11 @@ double MCTS::CalculateUCT(std::shared_ptr<Node> node) {
   const double exploration = kExplorationConstant * 
       std::sqrt(std::log(parent_visits) / child_visits);
 
-  //Logger::Log(LogLevel::DEBUG, "UCT value: " + std::to_string(exploration + exploitation));
   return exploitation + exploration;
 }
 
 std::vector<int> MCTS::GetValidActions(std::shared_ptr<Node> node) {
   auto valid_actions = node->GetState()->GetValidActions();
-  //Logger::Log(LogLevel::DEBUG, "Valid actions: " + std::to_string(valid_actions.size()));
   return valid_actions;
 }
 
@@ -99,22 +120,22 @@ double MCTS::Simulate(const std::shared_ptr<Node>& node) {
   // Perform random moves until a terminal state is reached
   while (!state->IsTerminal()) {
     std::vector<int> valid_actions = state->GetValidActions();
-    //Logger::Log(LogLevel::DEBUG, "Valid actions: " + std::to_string(valid_actions.size()));
     int random_action = valid_actions[kGenerator() % valid_actions.size()];
-    //Logger::Log(LogLevel::DEBUG, "Random action: " + std::to_string(random_action));
     state->ApplyAction(random_action);
   }
 
   // Return the evaluation of the terminal state
-  return state->Evaluate();
+  auto value = state->Evaluate();
+  return value;
 }
 
 void MCTS::Backpropagate(const std::shared_ptr<Node>& node, double value) {
   std::shared_ptr<Node> current = node;
   while (current) {
+
+    auto oldValue = current->GetTotalValue();
     current->AddValue(value);
-    Logger::Log(LogLevel::DEBUG, "Backpropagating at node with action: " + std::to_string(current->GetAction()) +
-                            ", New visit count: " + std::to_string(current->GetVisitCount()));
+    auto newValue = current->GetTotalValue();
     current = current->GetParent().lock();
   }
 }
@@ -126,12 +147,15 @@ void MCTS::Search() {
     
     // 2. Expansion phase.
     std::shared_ptr<Node> expanded = Expand(selected);
-    
+    if(expanded == nullptr) {
+      expanded = selected;
+    }
+
     // 3. Simulation phase.
-    double value = Simulate(expanded ? expanded : selected);
+    double value = Simulate(expanded);
     
     // 4. Backpropagation phase.
-    Backpropagate(expanded ? expanded : selected, value);
+    Backpropagate(expanded, value);
   }
 }
 

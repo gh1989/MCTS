@@ -6,6 +6,7 @@
 
 enum class LogLevel {
     DEBUG,
+    TEST,
     INFO,
     WARNING,
     ERROR
@@ -26,6 +27,7 @@ class Logger {
  private:
   static std::string ToString(LogLevel level) {
     switch (level) {
+      case LogLevel::TEST: return "TEST";
       case LogLevel::DEBUG: return "DEBUG";
       case LogLevel::INFO: return "INFO";
       case LogLevel::WARNING: return "WARNING";
