@@ -132,10 +132,7 @@ double MCTS::Simulate(const std::shared_ptr<Node>& node) {
 void MCTS::Backpropagate(const std::shared_ptr<Node>& node, double value) {
   std::shared_ptr<Node> current = node;
   while (current) {
-
-    auto oldValue = current->GetTotalValue();
     current->AddValue(value);
-    auto newValue = current->GetTotalValue();
     current = current->GetParent().lock();
   }
 }

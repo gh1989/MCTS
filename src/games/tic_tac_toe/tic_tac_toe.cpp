@@ -6,9 +6,9 @@ TicTacToeState::TicTacToeState() : board_({0}), current_player_(1) {}
 
 std::vector<int> TicTacToeState::GetValidActions() const {
   std::vector<int> actions;
-  for (int i = 0; i < board_.size(); ++i) {
+  for (size_t i = 0; i < board_.size(); ++i) {
     if (board_[i] == 0) {
-      actions.push_back(i);
+      actions.push_back(static_cast<int>(i));
     }
   }
   //Logger::Log(LogLevel::DEBUG, "Valid actions: " + std::to_string(actions.size()));
@@ -16,7 +16,9 @@ std::vector<int> TicTacToeState::GetValidActions() const {
 }
 
 void TicTacToeState::ApplyAction(int action) {
-  if (action >= 0 && action < board_.size() && board_[action] == 0) {
+  // We are ensuring an upper bound so the NO_ACTION will never be relevant.
+  // Otherwise there is an annoying warning.
+  if (action >= 0 && static_cast<size_t>(action) < board_.size() && board_[action] == 0) {
     board_[action] = current_player_;
     current_player_ = -current_player_;
   }
@@ -48,7 +50,7 @@ bool TicTacToeState::CheckWin(int player) const {
 
 void TicTacToeState::Print() const {
   std::string board_representation = "Current TicTacToe state:\n";
-  for (int i = 0; i < board_.size(); ++i) {
+  for (size_t i = 0; i < board_.size(); ++i) {
     char symbol = board_[i] == 1 ? 'X' : (board_[i] == -1 ? 'O' : '.');
     board_representation += symbol;
     board_representation += " ";

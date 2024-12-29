@@ -1,7 +1,10 @@
 #include <iostream>
 #include "games/tic_tac_toe/tic_tac_toe.h"
 #include "common/logger.h"
-int main() {
+#include <torch/torch.h>
+#include <cassert>
+
+void TestTicTacToeStateInitialization() {
     TicTacToeState state;
 
     // Test initial valid actions
@@ -28,6 +31,48 @@ int main() {
 
     // Evaluate the current state
     Logger::Log(LogLevel::TEST, "State evaluation: " + std::to_string(state.Evaluate()));
+}
 
+void TestTicTacToeStateToTensor() {
+    Logger::Log(LogLevel::INFO, "Starting TicTacToe state to tensor test");
+    
+    TicTacToeState state;
+    
+    // Test initial state tensor
+    torch::Tensor initial_tensor = state.ToTensor();
+    assert(initial_tensor.sizes() == torch::IntArrayRef({1, 3, 3, 3}));
+    
+    // Check that initial board is empty (all zeros in first two channels)
+    assert(initial_tensor[0][0].sum().item<int>() == 0);  // X positions
+    assert(initial_tensor[0][1].sum().item<int>() == 0);  // O positions
+    
+    // Check that it's X's turn (all ones in third channel)
+    assert(initial_tensor[0][2].sum().item<int>() == 9);  // Turn channel
+    
+    // Make some moves and verify tensor
+    state.ApplyAction(4);  // X plays center
+    torch::Tensor after_move_tensor = state.ToTensor();
+    
+    // Check X's move
+    assert(after_move_tensor[0][0][1][1].item<int>() == 1);  // Center position has X
+    
+    // Check it's O's turn (all zeros in third channel)
+    assert(after_move_tensor[0][2].sum().item<int>() == 0);
+    
+    state.ApplyAction(0);  // O plays top-left
+    torch::Tensor final_tensor = state.ToTensor();
+    
+    // Check O's move
+    assert(final_tensor[0][1][0][0].item<int>() == 1);  // Top-left has O
+    
+    // Check it's X's turn again
+    assert(final_tensor[0][2].sum().item<int>() == 9);
+    
+    Logger::Log(LogLevel::INFO, "TicTacToe state to tensor test passed");
+}
+
+int main() {
+    TestTicTacToeStateInitialization();
+    TestTicTacToeStateToTensor();
     return 0;
 }

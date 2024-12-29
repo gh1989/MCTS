@@ -3,28 +3,23 @@
 
 #include <vector>
 #include <memory>
+#include <torch/torch.h>
 
 class State {
  public:
   virtual ~State() = default;
 
-  // Returns a list of valid actions from the current state.
+  // Game logic methods
   virtual std::vector<int> GetValidActions() const = 0;
-
-  // Applies an action to the current state.
   virtual void ApplyAction(int action) = 0;
-
-  // Checks if the current state is terminal.
   virtual bool IsTerminal() const = 0;
-
-  // Evaluates the current state (e.g., win, loss, draw).
   virtual double Evaluate() const = 0;
-
-  // Clones the current state for simulation purposes.
   virtual std::unique_ptr<State> Clone() const = 0;
-
-  // Prints the current state.
   virtual void Print() const = 0;
+
+  // Neural network interface
+  virtual torch::Tensor ToTensor() const = 0;
+  virtual std::vector<int64_t> GetTensorShape() const = 0;  // Returns expected shape for this game
 };
 
 #endif  // STATE_H_
