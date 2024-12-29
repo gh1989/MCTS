@@ -18,6 +18,11 @@ std::mt19937 kGenerator(kRandomDevice());
 
 }  // namespace
 
+MCTS::MCTS(int simulation_count, StateFactory state_factory)
+    : simulation_count_(simulation_count) {
+    root_ = std::make_shared<Node>(std::weak_ptr<Node>(), 0, -1, state_factory());
+}
+
 std::shared_ptr<Node> MCTS::Select(std::shared_ptr<Node> node) {
   std::shared_ptr<Node> current = node;
   while (!IsTerminal(current) && !current->GetChildren().empty()) {
@@ -132,4 +137,8 @@ int MCTS::GetBestAction() {
     }
   }
   return best_action;
+}
+
+std::shared_ptr<Node> MCTS::GetRoot() const {
+  return root_;
 }

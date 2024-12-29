@@ -1,4 +1,5 @@
 #include "games/tic_tac_toe.h"
+#include <iostream> 
 
 TicTacToeState::TicTacToeState() : board_({0}), current_player_(1) {}
 
@@ -41,4 +42,14 @@ bool TicTacToeState::CheckWin(int player) const {
     }
   }
   return false;
+}
+
+void TicTacToeState::Print() const {
+  for (int i = 0; i < board_.size(); ++i) {
+    char symbol = board_[i] == 1 ? 'X' : (board_[i] == -1 ? 'O' : '.');
+    std::cout << symbol << " ";
+    if ((i + 1) % 3 == 0) {
+      std::cout << std::endl;
+    }
+  }
 }

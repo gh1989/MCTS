@@ -22,6 +22,9 @@ class State {
 
   // Clones the current state for simulation purposes.
   virtual std::unique_ptr<State> Clone() const = 0;
+
+  // Prints the current state.
+  virtual void Print() const = 0;
 };
 
 #endif  // STATE_H_

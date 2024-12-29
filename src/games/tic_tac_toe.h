@@ -16,6 +16,7 @@ class TicTacToeState : public State {
   std::unique_ptr<State> Clone() const override {
     return std::make_unique<TicTacToeState>(*this);
   }
+  void Print() const override;
 
  private:
   std::array<int, 9> board_;  // 3x3 board represented as a 1D array

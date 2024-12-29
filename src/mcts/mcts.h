@@ -8,6 +8,7 @@
 #include <random>
 #include <memory>
 #include <unordered_map>
+#include <functional>
 
 // Represents a node in the Monte Carlo Tree Search tree. Each node maintains
 // parent-child relationships and tracks which player's turn it is.
@@ -20,7 +21,9 @@ class Node : public std::enable_shared_from_this<Node> {
   // - action: The action that led to this node from its parent. Defaults to -1, indicating no action (e.g., for the root node).
   // - state: A unique pointer to the state of the game at this node. Defaults to nullptr, indicating an uninitialized or placeholder node.
   Node(std::weak_ptr<Node> parent = std::weak_ptr<Node>(), int player_to_move = 0, int action = -1, std::unique_ptr<State> state = nullptr)
-      : parent_(parent), player_to_move_(player_to_move), action_(action), state_(std::move(state)) {}
+      : parent_(parent), player_to_move_(player_to_move), action_(action), state_(std::move(state)) {
+
+  }
 
   // Creates and adds a child node for the specified player.
   // Returns a shared pointer to the newly created child.
@@ -75,14 +78,21 @@ class Node : public std::enable_shared_from_this<Node> {
 // 4. Backpropagation: Update statistics back up tree
 class MCTS {
  public:
+  using StateFactory = std::function<std::unique_ptr<State>()>;
+
   // Creates a new MCTS instance with specified simulation count.
-  explicit MCTS(int simulation_count = 1000);
+  explicit MCTS(int simulation_count, StateFactory state_factory);
 
   // Returns the best action found from the current state.
   int GetBestAction();
 
   // Runs the MCTS search from the current state.
   void Search();
+
+  std::shared_ptr<Node> GetRoot() const;
+
+  // Make IsTerminal public
+  bool IsTerminal(std::shared_ptr<Node> node) { return node->GetState()->IsTerminal(); };
 
  private:
   // Selects the most promising node using UCT.
@@ -104,9 +114,6 @@ class MCTS {
   // Returns list of valid actions from the current node.
   std::vector<int> GetValidActions(std::shared_ptr<Node> node);
 
-  // Returns true if the node represents a terminal state.
-  bool IsTerminal(std::shared_ptr<Node> node) { return node->GetState()->IsTerminal(); };
-
   // Root node of the search tree.
   std::shared_ptr<Node> root_;
   
@@ -115,10 +122,5 @@ class MCTS {
 
   std::shared_ptr<Node> SelectBestChild(std::shared_ptr<Node> node);
 };
-
-inline MCTS::MCTS(int simulation_count)
-    : simulation_count_(simulation_count) {
-  root_ = std::make_shared<Node>();
-}
 
 #endif  // MCTS_H_

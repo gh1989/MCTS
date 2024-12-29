@@ -14,3 +14,11 @@ add_executable(BasicTest
     src/games/tic_tac_toe.cpp
     src/mcts/mcts.cpp
 )
+
+add_executable(MCTSTest
+    tests/mcts_test.cpp
+    src/games/tic_tac_toe.cpp
+    src/mcts/mcts.cpp
+)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
