@@ -19,6 +19,9 @@ add_library(mcts_lib
     src/games/tic_tac_toe/tic_tac_toe.cpp
     src/common/logger.cpp
     src/mcts/mcts.cpp
+    src/training/training_manager.cpp
+    src/arena/arena_manager.cpp
+    src/benchmarking/benchmark_runner.cpp
 )
 
 # Link torch to the library and set include directories
@@ -40,8 +43,30 @@ add_executable(NetworkTest tests/network_test.cpp)
 target_link_libraries(NetworkTest mcts_lib "${TORCH_LIBRARIES}")
 target_include_directories(NetworkTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
-# Set output directories
-set_target_properties(StateTest MCTSTest PROPERTIES
+# Agent Test
+add_executable(AgentTest tests/agent_test.cpp)
+target_link_libraries(AgentTest mcts_lib "${TORCH_LIBRARIES}")
+target_include_directories(AgentTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Arena Test
+add_executable(ArenaTest tests/arena_test.cpp)
+target_link_libraries(ArenaTest mcts_lib "${TORCH_LIBRARIES}")
+target_include_directories(ArenaTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Training Test
+add_executable(TrainingTest tests/training_test.cpp)
+target_link_libraries(TrainingTest mcts_lib "${TORCH_LIBRARIES}")
+target_include_directories(TrainingTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Set output directories for all tests
+set_target_properties(
+    StateTest 
+    MCTSTest 
+    NetworkTest 
+    AgentTest 
+    ArenaTest 
+    TrainingTest
+    PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
