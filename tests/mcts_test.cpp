@@ -14,18 +14,19 @@ int main() {
         // Debugging output
         std::cout << "MCTS selected action: " << action << std::endl;
         std::cout << "Current state before action:" << std::endl;
-        mcts.GetRoot()->GetState()->Print();  // Assuming Print() is a method to display the state
+        mcts.GetRoot()->GetState()->Print();
 
         mcts.GetRoot()->GetState()->ApplyAction(action);
 
         // Update the root node to reflect the new state
         auto new_state = mcts.GetRoot()->GetState()->Clone();
-        mcts.GetRoot() = std::make_shared<Node>(
+        auto new_root = std::make_shared<Node>(
             std::weak_ptr<Node>(),
             1 - mcts.GetRoot()->GetPlayerToMove(),
             action,
             std::move(new_state)
         );
+        mcts.SetRoot(new_root);
 
         std::cout << "Current state after action:" << std::endl;
         mcts.GetRoot()->GetState()->Print();

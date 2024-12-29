@@ -142,3 +142,7 @@ int MCTS::GetBestAction() {
 std::shared_ptr<Node> MCTS::GetRoot() const {
   return root_;
 }
+
+void MCTS::SetRoot(std::shared_ptr<Node> new_root) {
+  root_ = std::move(new_root);
+}

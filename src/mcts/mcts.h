@@ -94,6 +94,9 @@ class MCTS {
   // Make IsTerminal public
   bool IsTerminal(std::shared_ptr<Node> node) { return node->GetState()->IsTerminal(); };
 
+  // Sets the root node of the search tree.
+  void SetRoot(std::shared_ptr<Node> new_root);
+
  private:
   // Selects the most promising node using UCT.
   std::shared_ptr<Node> Select(std::shared_ptr<Node> node);
