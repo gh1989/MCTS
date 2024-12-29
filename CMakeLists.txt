@@ -25,14 +25,20 @@ add_library(mcts_lib
 target_link_libraries(mcts_lib "${TORCH_LIBRARIES}")
 target_include_directories(mcts_lib PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
-# Add the test executables
+# State Test
 add_executable(StateTest tests/state_test.cpp)
 target_link_libraries(StateTest mcts_lib "${TORCH_LIBRARIES}")
 target_include_directories(StateTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+# MCTS Test
 add_executable(MCTSTest tests/mcts_test.cpp)
 target_link_libraries(MCTSTest mcts_lib "${TORCH_LIBRARIES}")
 target_include_directories(MCTSTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Network Test
+add_executable(NetworkTest tests/network_test.cpp)
+target_link_libraries(NetworkTest mcts_lib "${TORCH_LIBRARIES}")
+target_include_directories(NetworkTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # Set output directories
 set_target_properties(StateTest MCTSTest PROPERTIES
