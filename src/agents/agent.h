@@ -13,13 +13,13 @@ class Agent {
   virtual int GetAction(const std::shared_ptr<State>& state) = 0;
   
   // Optional: Save agent's model/parameters to a file
-  virtual void SaveModel(const std::string& filepath) {}
+  virtual void SaveModel([[maybe_unused]] const std::string& filepath) {}
   
   // Optional: Load agent's model/parameters from a file
-  virtual void LoadModel(const std::string& filepath) {}
+  virtual void LoadModel([[maybe_unused]] const std::string& filepath) {}
   
   // Optional: Set whether the agent is in training mode
-  virtual void SetTrainingMode(bool is_training) {}
+  virtual void SetTrainingMode([[maybe_unused]] bool is_training) {}
 };
 
 #endif  // AGENT_H_ 

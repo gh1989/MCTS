@@ -22,9 +22,7 @@ class MCTSAgent : public Agent {
   int GetAction(const std::shared_ptr<State>& state) override {
     // Initialize MCTS with current state and config parameters
     MCTS mcts(config_.simulations_per_move,
-              [&state]() { return std::unique_ptr<State>(state->Clone()); },
-              config_.exploration_constant,
-              config_.temperature);
+              [&state]() { return std::unique_ptr<State>(state->Clone()); });
     
     // Run search using network for guidance
     mcts.Search([this](const State& state) {
@@ -75,12 +73,12 @@ class MCTSAgent : public Agent {
       int num_batches = 0;
 
       // Process data in batches
-      for (int i = 0; i < buffer.size(); i += config_.batch_size) {
+      for (size_t i = 0; i < buffer.size(); i += config_.batch_size) {
         // Prepare batch
         std::vector<torch::Tensor> states, policies, values;
-        int batch_end = std::min(i + config_.batch_size, static_cast<int>(buffer.size()));
+        size_t batch_end = std::min(i + config_.batch_size, buffer.size());
         
-        for (int j = i; j < batch_end; ++j) {
+        for (size_t j = i; j < batch_end; ++j) {
           const auto& [state, outcome] = buffer[j];
           states.push_back(state->ToTensor());
           
@@ -158,8 +156,7 @@ class MCTSAgent : public Agent {
 
   std::shared_ptr<ValuePolicyNetwork> CloneNetwork() const {
     auto clone = network_->clone();
-    clone->to(network_->parameters().begin()->device());
-    return clone;
+    return std::dynamic_pointer_cast<ValuePolicyNetwork>(clone);
   }
 
  private:

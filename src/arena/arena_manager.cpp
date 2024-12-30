@@ -7,6 +7,8 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
                                  std::shared_ptr<State> initial_state,
                                  bool record_history) {
     MatchResult result;
+    result.player1 = player1;
+    result.player2 = player2;
     auto state = std::shared_ptr<State>(initial_state->Clone());
     std::shared_ptr<Agent> current_player = player1;
     
@@ -32,6 +34,7 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
 
 std::vector<MatchResult> ArenaManager::RunTournament(
     const std::vector<std::shared_ptr<Agent>>& agents,
+    std::shared_ptr<State> initial_state,
     int games_per_matchup) {
     
     std::vector<MatchResult> results;
@@ -42,13 +45,11 @@ std::vector<MatchResult> ArenaManager::RunTournament(
                 "Playing matchup " + std::to_string(i) + " vs " + std::to_string(j));
             
             for (int game = 0; game < games_per_matchup; ++game) {
-                // Alternate colors between games
                 auto result = (game % 2 == 0) 
-                    ? PlayGame(agents[i], agents[j])
-                    : PlayGame(agents[j], agents[i]);
+                    ? PlayGame(agents[i], agents[j], initial_state, false)
+                    : PlayGame(agents[j], agents[i], initial_state, false);
                     
                 if (game % 2 == 1) {
-                    // Flip result if players were swapped
                     result.winner = -result.winner;
                 }
                 
@@ -75,11 +76,15 @@ void ArenaManager::UpdateRatings(const MatchResult& result) {
     double actual_score2 = 1.0 - actual_score1;
     
     // Update ratings
-    result.player1_elo_change = kEloK * (actual_score1 - expected_score1);
-    result.player2_elo_change = kEloK * (actual_score2 - expected_score2);
+    double p1_change = kEloK * (actual_score1 - expected_score1);
+    double p2_change = kEloK * (actual_score2 - expected_score2);
     
-    elo_ratings_[result.player1] += result.player1_elo_change;
-    elo_ratings_[result.player2] += result.player2_elo_change;
+    elo_ratings_[result.player1] += p1_change;
+    elo_ratings_[result.player2] += p2_change;
+    
+    // Store changes in the result (cast away const)
+    const_cast<MatchResult&>(result).player1_elo_change = p1_change;
+    const_cast<MatchResult&>(result).player2_elo_change = p2_change;
 }
 
 double ArenaManager::GetAgentRating(const std::shared_ptr<Agent>& agent) const {

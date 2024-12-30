@@ -15,8 +15,13 @@ std::mt19937 kGenerator(kRandomDevice());
 
 } 
 
-MCTS::MCTS(int simulation_count, StateFactory state_factory)
-    : simulation_count_(simulation_count) {
+MCTS::MCTS(int simulation_count, 
+           StateFactory state_factory,
+           double exploration_constant,
+           double temperature)
+    : simulation_count_(simulation_count),
+      exploration_constant_(exploration_constant),
+      temperature_(temperature) {
     std::weak_ptr<Node> parent;
     int player_to_move = 0;
     int action = NO_ACTION;
@@ -84,7 +89,7 @@ double MCTS::CalculateUCT(std::shared_ptr<Node> node) {
   }
 
   const double exploitation = node->GetTotalValue() / child_visits;
-  const double exploration = kExplorationConstant * 
+  const double exploration = exploration_constant_ * 
       std::sqrt(std::log(parent_visits) / child_visits);
 
   return exploitation + exploration;
@@ -137,21 +142,29 @@ void MCTS::Backpropagate(const std::shared_ptr<Node>& node, double value) {
   }
 }
 
-void MCTS::Search() {
+void MCTS::Search(NetworkEvaluator evaluator) {
   for (int i = 0; i < simulation_count_; ++i) {
-    // 1. Selection phase.
+    // 1. Selection phase
     std::shared_ptr<Node> selected = Select(root_);
     
-    // 2. Expansion phase.
+    // 2. Expansion phase
     std::shared_ptr<Node> expanded = Expand(selected);
     if(expanded == nullptr) {
       expanded = selected;
     }
 
-    // 3. Simulation phase.
-    double value = Simulate(expanded);
+    // 3. Simulation/Evaluation phase
+    double value;
+    if (evaluator) {
+      // Use neural network evaluation
+      auto [policy, eval] = evaluator(*expanded->GetState());
+      value = eval;
+    } else {
+      // Use random rollout
+      value = Simulate(expanded);
+    }
     
-    // 4. Backpropagation phase.
+    // 4. Backpropagation phase
     Backpropagate(expanded, value);
   }
 }
@@ -174,4 +187,26 @@ std::shared_ptr<Node> MCTS::GetRoot() const {
 
 void MCTS::SetRoot(std::shared_ptr<Node> new_root) {
   root_ = std::move(new_root);
+}
+
+std::vector<int> MCTS::GetVisitCounts() const {
+    std::vector<int> visit_counts;
+    for (const auto& child : root_->GetChildren()) {
+        visit_counts.push_back(child->GetVisitCount());
+    }
+    return visit_counts;
+}
+
+int MCTS::GetHighestValueAction() const {
+    int best_action = NO_ACTION;
+    double highest_value = -std::numeric_limits<double>::infinity();
+    
+    for (const auto& child : root_->GetChildren()) {
+        double avg_value = child->GetTotalValue() / child->GetVisitCount();
+        if (avg_value > highest_value) {
+            highest_value = avg_value;
+            best_action = child->GetAction();
+        }
+    }
+    return best_action;
 }

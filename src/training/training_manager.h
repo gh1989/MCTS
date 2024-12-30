@@ -3,19 +3,19 @@
 
 #include "agents/agent.h"
 #include "arena/arena_manager.h"
+#include "common/network.h"
+#include "common/state.h"
+#include "agents/mcts_agent.h"
+#include "networks/tic_tac_toe_network.h"
 #include <vector>
 #include <memory>
-
-struct TrainingConfig {
-    int num_self_play_games = 1000;
-    int games_per_evaluation = 100;
-    double required_win_rate = 0.55;
-    std::string checkpoint_dir = "checkpoints/";
-};
+#include "config/training_config.h"
 
 class TrainingManager {
 public:
-    explicit TrainingManager(const TrainingConfig& config);
+    TrainingManager(const TrainingConfig& config,
+                   std::shared_ptr<State> initial_state,
+                   std::shared_ptr<ValuePolicyNetwork> network);
 
     // Generate self-play games and train network
     void RunTrainingIteration();
@@ -34,6 +34,7 @@ private:
     ArenaManager arena_;
     
     std::vector<std::pair<std::shared_ptr<State>, int>> self_play_buffer_;
+    std::shared_ptr<State> initial_state_;
 };
 
 #endif  // TRAINING_MANAGER_H_ 

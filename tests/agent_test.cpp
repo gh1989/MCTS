@@ -3,6 +3,7 @@
 #include "agents/random_agent.h"
 #include "common/logger.h"
 #include "games/tic_tac_toe/tic_tac_toe.h"
+#include "networks/tic_tac_toe_network.h"
 #include <memory>
 
 void TestRandomAgent() {
@@ -14,7 +15,8 @@ void TestRandomAgent() {
     for (int i = 0; i < 10; ++i) {
         int action = agent->GetAction(state);
         Logger::Log(LogLevel::TEST, "Random action selected: " + std::to_string(action));
-        if (!state->IsValidAction(action)) {
+        auto valid_actions = state->GetValidActions();
+        if (std::find(valid_actions.begin(), valid_actions.end(), action) == valid_actions.end()) {
             Logger::Log(LogLevel::ERROR, "Invalid action selected: " + std::to_string(action));
             return;
         }
@@ -31,7 +33,7 @@ void TestMCTSAgentWithNetwork() {
     config.simulations_per_move = 100;
     config.exploration_constant = 1.4142;
     
-    auto network = std::make_shared<ValuePolicyNetwork>();
+    auto network = std::make_shared<TicTacToeNetwork>();
     auto agent = std::make_shared<MCTSAgent>(network, config);
     auto state = std::make_shared<TicTacToeState>();
     
@@ -52,7 +54,7 @@ void TestAgentFactory() {
     Logger::Log(LogLevel::TEST, "Starting agent factory test");
     
     TrainingConfig config;
-    auto network = std::make_shared<ValuePolicyNetwork>();
+    auto network = std::make_shared<TicTacToeNetwork>();
     
     // Test random agent creation
     auto random_agent = AgentFactory::CreateAgent("random", config);

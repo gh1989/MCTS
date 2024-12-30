@@ -104,15 +104,19 @@ class Node : public std::enable_shared_from_this<Node> {
 class MCTS {
  public:
   using StateFactory = std::function<std::unique_ptr<State>()>;
+  using NetworkEvaluator = std::function<std::pair<torch::Tensor, float>(const State&)>;
 
   // Creates a new MCTS instance with specified simulation count.
-  explicit MCTS(int simulation_count, StateFactory state_factory);
+  explicit MCTS(int simulation_count, 
+                StateFactory state_factory,
+                double exploration_constant = std::sqrt(2),
+                double temperature = 1.0);
 
   // Returns the best action found from the current state.
   int GetBestAction();
 
   // Runs the MCTS search from the current state.
-  void Search();
+  void Search(NetworkEvaluator evaluator = nullptr);
 
   std::shared_ptr<Node> GetRoot() const;
 
@@ -121,6 +125,10 @@ class MCTS {
 
   // Sets the root node of the search tree.
   void SetRoot(std::shared_ptr<Node> new_root);
+
+  std::vector<int> GetVisitCounts() const;
+
+  int GetHighestValueAction() const;
 
  private:
   // Selects the most promising node using UCT.
@@ -152,6 +160,9 @@ class MCTS {
 
   // Add a friend declaration for the test function
   friend void TestSingleSimulation();
+
+  const double exploration_constant_;
+  const double temperature_;
 };
 
 #endif  // MCTS_H_

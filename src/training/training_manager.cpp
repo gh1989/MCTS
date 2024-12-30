@@ -1,5 +1,8 @@
 #include "training/training_manager.h"
 #include "common/logger.h"
+#include "common/network.h"
+#include "agents/mcts_agent.h"
+#include "networks/tic_tac_toe_network.h"
 #include <filesystem>
 #include <algorithm>
 
@@ -7,11 +10,23 @@ TrainingManager::TrainingManager(const TrainingConfig& config,
                                std::shared_ptr<State> initial_state,
                                std::shared_ptr<ValuePolicyNetwork> network)
     : config_(config),
-      initial_state_(initial_state) {
+      initial_state_(initial_state),
+      arena_() {
     std::filesystem::create_directories(config.checkpoint_dir);
     
-    best_agent_ = std::make_shared<MCTSAgent>(network);
-    training_agent_ = std::make_shared<MCTSAgent>(network->clone());
+    auto value_policy_net = std::dynamic_pointer_cast<ValuePolicyNetwork>(network);
+    if (!value_policy_net) {
+        throw std::runtime_error("Network must be a ValuePolicyNetwork");
+    }
+    
+    best_agent_ = std::make_shared<MCTSAgent>(
+        std::dynamic_pointer_cast<ValuePolicyNetwork>(network), 
+        config
+    );
+    training_agent_ = std::make_shared<MCTSAgent>(
+        std::dynamic_pointer_cast<ValuePolicyNetwork>(network)->clone(),
+        config
+    );
 }
 
 void TrainingManager::RunTrainingIteration() {
@@ -31,15 +46,24 @@ void TrainingManager::RunTrainingIteration() {
     Logger::Log(LogLevel::INFO, "Training network on " + 
         std::to_string(self_play_buffer_.size()) + " positions");
     
-    training_agent_->TrainOnBuffer(self_play_buffer_);
+    auto mcts_agent = std::dynamic_pointer_cast<MCTSAgent>(training_agent_);
+    if (mcts_agent) {
+        mcts_agent->TrainOnBuffer(self_play_buffer_);
+    }
     
     if (EvaluateNewNetwork()) {
         Logger::Log(LogLevel::INFO, "New network accepted as best");
         SaveCheckpoint(config_.checkpoint_dir + "/best_network.pt");
-        best_agent_ = std::make_shared<MCTSAgent>(training_agent_->CloneNetwork());
+        best_agent_ = std::make_shared<MCTSAgent>(
+            std::dynamic_pointer_cast<MCTSAgent>(training_agent_)->CloneNetwork(),
+            config_
+        );
     } else {
         Logger::Log(LogLevel::INFO, "New network rejected, reverting");
-        training_agent_ = std::make_shared<MCTSAgent>(best_agent_->CloneNetwork());
+        training_agent_ = std::make_shared<MCTSAgent>(
+            std::dynamic_pointer_cast<MCTSAgent>(best_agent_)->CloneNetwork(),
+            config_
+        );
     }
 }
 
@@ -50,8 +74,8 @@ bool TrainingManager::EvaluateNewNetwork() {
     
     for (int game = 0; game < config_.games_per_evaluation; ++game) {
         auto result = (game % 2 == 0)
-            ? arena_.PlayGame(training_agent_, best_agent_)
-            : arena_.PlayGame(best_agent_, training_agent_);
+            ? arena_.PlayGame(training_agent_, best_agent_, false)
+            : arena_.PlayGame(best_agent_, training_agent_, false);
             
         if (game % 2 == 1) result.winner = -result.winner;
         

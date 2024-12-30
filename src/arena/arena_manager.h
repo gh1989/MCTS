@@ -10,6 +10,8 @@
 struct MatchResult {
     int winner;  // 1 for player1, -1 for player2, 0 for draw
     std::vector<std::pair<std::shared_ptr<State>, int>> game_history;
+    std::shared_ptr<Agent> player1;
+    std::shared_ptr<Agent> player2;
     double player1_elo_change;
     double player2_elo_change;
 };
@@ -19,11 +21,13 @@ public:
     // Play a single game between two agents
     MatchResult PlayGame(std::shared_ptr<Agent> player1, 
                         std::shared_ptr<Agent> player2,
-                        bool record_history = false);
+                        std::shared_ptr<State> initial_state,
+                        bool training_mode);
     
     // Run a tournament between multiple agents
     std::vector<MatchResult> RunTournament(
         const std::vector<std::shared_ptr<Agent>>& agents,
+        std::shared_ptr<State> initial_state,
         int games_per_matchup = 100);
     
     // Update ELO ratings based on match results

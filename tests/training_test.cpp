@@ -2,6 +2,7 @@
 #include "agents/agent_factory.h"
 #include "common/logger.h"
 #include "games/tic_tac_toe/tic_tac_toe.h"
+#include "networks/tic_tac_toe_network.h"
 #include <filesystem>
 
 void TestTrainingIteration() {
@@ -13,7 +14,7 @@ void TestTrainingIteration() {
     config.checkpoint_dir = "test_checkpoints/";
     
     auto initial_state = std::make_shared<TicTacToeState>();
-    auto network = std::make_shared<ValuePolicyNetwork>();
+    auto network = std::make_shared<TicTacToeNetwork>();
     
     TrainingManager manager(config, initial_state, network);
     
@@ -36,7 +37,7 @@ void TestNetworkEvaluation() {
     config.games_per_evaluation = 10;
     
     auto initial_state = std::make_shared<TicTacToeState>();
-    auto network = std::make_shared<ValuePolicyNetwork>();
+    auto network = std::make_shared<TicTacToeNetwork>();
     
     TrainingManager manager(config, initial_state, network);
     
@@ -54,7 +55,7 @@ void TestCheckpointSaveLoad() {
     config.checkpoint_dir = "test_checkpoints/";
     
     auto initial_state = std::make_shared<TicTacToeState>();
-    auto network = std::make_shared<ValuePolicyNetwork>();
+    auto network = std::make_shared<TicTacToeNetwork>();
     
     TrainingManager manager(config, initial_state, network);
     
