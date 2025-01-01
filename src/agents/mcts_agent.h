@@ -27,7 +27,7 @@ class MCTSAgent : public Agent {
     // Run search using network for guidance
     mcts.Search([this](const State& state) {
       auto tensor = state.ToTensor();
-      auto [policy, value] = network_->forward(tensor.unsqueeze(0));
+      auto [policy, value] = network_->forward(tensor);
       return std::make_pair(policy.squeeze(), value.squeeze().item<float>());
     });
     
@@ -89,7 +89,7 @@ class MCTSAgent : public Agent {
                    config_.temperature);
           mcts.Search([this](const State& s) {
             auto tensor = s.ToTensor();
-            auto [p, v] = network_->forward(tensor.unsqueeze(0));
+            auto [p, v] = network_->forward(tensor);
             return std::make_pair(p.squeeze(), v.squeeze().item<float>());
           });
           
