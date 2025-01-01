@@ -8,8 +8,8 @@ void TestArenaGamePlay() {
     Logger::Log(LogLevel::TEST, "Starting arena gameplay test");
     
     TrainingConfig config;
-    ArenaManager arena;
     auto initial_state = std::make_shared<TicTacToeState>();
+    ArenaManager arena(initial_state);
     
     // Create two random agents for testing
     auto agent1 = AgentFactory::CreateAgent("random", config);
@@ -35,8 +35,9 @@ void TestArenaGameHistory() {
     Logger::Log(LogLevel::TEST, "Starting arena game history test");
     
     TrainingConfig config;
-    ArenaManager arena;
     auto initial_state = std::make_shared<TicTacToeState>();
+    ArenaManager arena(initial_state);
+    
     
     // Create MCTS agents for testing
     auto network = std::make_shared<TicTacToeNetwork>();

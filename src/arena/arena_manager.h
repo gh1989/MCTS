@@ -18,6 +18,10 @@ struct MatchResult {
 
 class ArenaManager {
 public:
+    // Add this constructor
+    explicit ArenaManager(std::shared_ptr<State> initial_state) 
+        : initial_state_(initial_state) {}
+    
     // Play a single game between two agents
     MatchResult PlayGame(std::shared_ptr<Agent> player1, 
                         std::shared_ptr<Agent> player2,
@@ -40,6 +44,7 @@ private:
     std::unordered_map<std::shared_ptr<Agent>, double> elo_ratings_;
     static constexpr double kInitialElo = 1500.0;
     static constexpr double kEloK = 32.0;
+    std::shared_ptr<State> initial_state_;
 };
 
 #endif  // ARENA_MANAGER_H_ 

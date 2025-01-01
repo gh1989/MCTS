@@ -3,7 +3,7 @@
 
 #include "common/network.h"
 #include <torch/torch.h>
-
+#include <torch/script.h> 
 class TicTacToeNetwork : public ValuePolicyNetwork {
 public:
     TicTacToeNetwork() {
@@ -30,8 +30,9 @@ public:
 
     std::shared_ptr<torch::nn::Module> clone() const override {
         auto cloned = std::make_shared<TicTacToeNetwork>();
-        torch::NoGradGuard no_grad;
-        cloned->load_state_dict(this->state_dict());
+        for (const auto& pair : named_parameters()) {
+            cloned->named_parameters()[pair.key()].copy_(pair.value());
+        }
         return cloned;
     }
 

@@ -11,20 +11,15 @@ TrainingManager::TrainingManager(const TrainingConfig& config,
                                std::shared_ptr<ValuePolicyNetwork> network)
     : config_(config),
       initial_state_(initial_state),
-      arena_() {
+      arena_(initial_state) {
     std::filesystem::create_directories(config.checkpoint_dir);
     
-    auto value_policy_net = std::dynamic_pointer_cast<ValuePolicyNetwork>(network);
-    if (!value_policy_net) {
-        throw std::runtime_error("Network must be a ValuePolicyNetwork");
-    }
-    
     best_agent_ = std::make_shared<MCTSAgent>(
-        std::dynamic_pointer_cast<ValuePolicyNetwork>(network), 
+        std::dynamic_pointer_cast<ValuePolicyNetwork>(network),
         config
     );
     training_agent_ = std::make_shared<MCTSAgent>(
-        std::dynamic_pointer_cast<ValuePolicyNetwork>(network)->clone(),
+        std::dynamic_pointer_cast<ValuePolicyNetwork>(network->clone()),
         config
     );
 }
@@ -74,8 +69,8 @@ bool TrainingManager::EvaluateNewNetwork() {
     
     for (int game = 0; game < config_.games_per_evaluation; ++game) {
         auto result = (game % 2 == 0)
-            ? arena_.PlayGame(training_agent_, best_agent_, false)
-            : arena_.PlayGame(best_agent_, training_agent_, false);
+            ? arena_.PlayGame(training_agent_, best_agent_, initial_state_, false)
+            : arena_.PlayGame(best_agent_, training_agent_, initial_state_, false);
             
         if (game % 2 == 1) result.winner = -result.winner;
         
