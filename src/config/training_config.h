@@ -21,6 +21,7 @@ struct TrainingConfig {
     double required_win_rate = 0.55;
     int batch_size = 256;
     int training_steps = 1000;
+    int log_frequency = 100;
     
     // File paths
     std::string checkpoint_dir = "checkpoints/";

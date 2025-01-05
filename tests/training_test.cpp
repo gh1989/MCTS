@@ -11,6 +11,8 @@ void TestTrainingIteration() {
     TrainingConfig config;
     config.num_self_play_games = 10;  // Reduced for testing
     config.games_per_evaluation = 5;
+    config.training_steps = 32;  // Reduced training steps
+    config.log_frequency = 1;    // Log every iteration
     config.checkpoint_dir = "test_checkpoints/";
     
     auto initial_state = std::make_shared<TicTacToeState>();

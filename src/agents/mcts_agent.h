@@ -164,7 +164,7 @@ class MCTSAgent : public Agent {
         }
 
         // Log progress
-        if ((step + 1) % 100 == 0) {
+        if ((step + 1) % config_.log_frequency == 0) {
             Logger::Log(LogLevel::INFO, 
                 "Training step " + std::to_string(step + 1) + "/" + 
                 std::to_string(config_.training_steps) + 
