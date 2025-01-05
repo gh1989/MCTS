@@ -12,7 +12,7 @@ void TestRandomAgent() {
     auto state = std::make_shared<TicTacToeState>();
     
     // Test multiple moves
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10 && !state->IsTerminal(); ++i) {
         int action = agent->GetAction(state);
         Logger::Log(LogLevel::TEST, "Random action selected: " + std::to_string(action));
         auto valid_actions = state->GetValidActions();

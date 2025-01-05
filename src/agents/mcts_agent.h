@@ -20,6 +20,11 @@ class MCTSAgent : public Agent {
       rng_(std::random_device{}()) {}
 
   int GetAction(const std::shared_ptr<State>& state) override {
+    if (state->IsTerminal()) {
+        std::cout << "[INFO] Game is in terminal state, no valid actions available\n";
+        return -1;
+    }
+
     // Initialize MCTS with current state and config parameters
     MCTS mcts(config_.simulations_per_move,
               [&state]() { return std::unique_ptr<State>(state->Clone()); });
@@ -94,10 +99,20 @@ class MCTSAgent : public Agent {
           });
           
           auto visit_counts = mcts.GetVisitCounts();
-          auto policy = torch::from_blob(visit_counts.data(), 
-                                       {static_cast<long>(visit_counts.size())},
-                                       torch::kFloat);
-          policy /= policy.sum();
+          auto policy = torch::zeros(state->GetActionSpace(), torch::kFloat);
+          auto valid_actions = state->GetValidActions();
+          
+          // Normalize visit counts to create probability distribution
+          float total_visits = 0;
+          for (const auto& count : visit_counts) {
+              total_visits += count;
+          }
+          
+          for (size_t i = 0; i < visit_counts.size(); ++i) {
+              // Convert to probability and assign to correct position in policy tensor
+              float prob = total_visits > 0 ? visit_counts[i] / total_visits : 0.0f;
+              policy[valid_actions[i]] = prob;
+          }
           policies.push_back(policy);
           
           values.push_back(torch::tensor(static_cast<float>(outcome)));
@@ -113,7 +128,10 @@ class MCTSAgent : public Agent {
         
         // Calculate losses
         auto policy_loss = torch::nn::functional::kl_div(
-            policy_output, policies_batch, torch::kNone);
+            policy_output,
+            policies_batch,
+            torch::nn::functional::KLDivFuncOptions().reduction(torch::kMean).log_target(true)
+        );
         auto value_loss = torch::nn::functional::mse_loss(
             value_output, values_batch);
         
@@ -123,8 +141,8 @@ class MCTSAgent : public Agent {
         total_loss.backward();
         optimizer.step();
 
-        total_policy_loss += policy_loss.item<float>();
-        total_value_loss += value_loss.item<float>();
+        total_policy_loss += policy_loss.item().toFloat();
+        total_value_loss += value_loss.item().toFloat();
         num_batches++;
       }
 

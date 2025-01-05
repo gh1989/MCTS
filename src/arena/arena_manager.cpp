@@ -12,7 +12,18 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
     auto state = std::shared_ptr<State>(initial_state->Clone());
     std::shared_ptr<Agent> current_player = player1;
     
+    // Record initial state if history is enabled
+    if (record_history) {
+        result.game_history.emplace_back(
+            std::shared_ptr<State>(state->Clone()), 
+            1  // First player's perspective
+        );
+    }
+    
     while (!state->IsTerminal()) {
+        int action = current_player->GetAction(state);
+        state->ApplyAction(action);
+        
         if (record_history) {
             result.game_history.emplace_back(
                 std::shared_ptr<State>(state->Clone()), 
@@ -20,15 +31,18 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
             );
         }
         
-        int action = current_player->GetAction(state);
-        state->ApplyAction(action);
         current_player = (current_player == player1) ? player2 : player1;
     }
     
     double final_value = state->Evaluate();
     result.winner = (final_value > 0) ? 1 : (final_value < 0) ? -1 : 0;
-    UpdateRatings(result);
     
+    // Record final state if history is enabled
+    if (record_history && !result.game_history.empty()) {
+        result.game_history.back().second = result.winner;  // Update final state with actual outcome
+    }
+    
+    UpdateRatings(result);
     return result;
 }
 

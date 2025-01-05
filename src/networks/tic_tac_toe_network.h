@@ -30,8 +30,16 @@ public:
 
     std::shared_ptr<torch::nn::Module> clone() const override {
         auto cloned = std::make_shared<TicTacToeNetwork>();
-        for (const auto& pair : named_parameters()) {
-            cloned->named_parameters()[pair.key()].copy_(pair.value());
+        torch::NoGradGuard no_grad;  // Disable gradients during cloning
+        for (const auto& item : named_parameters()) {
+            auto& name = item.key();
+            auto& param = item.value();
+            cloned->named_parameters()[name].copy_(param);
+        }
+        for (const auto& item : named_buffers()) {
+            auto& name = item.key();
+            auto& buffer = item.value();
+            cloned->named_buffers()[name].copy_(buffer);
         }
         return cloned;
     }

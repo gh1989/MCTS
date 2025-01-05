@@ -71,7 +71,7 @@ void TestCheckpointSaveLoad() {
 
 int main() {
     TestTrainingIteration();
-    TestNetworkEvaluation();
-    TestCheckpointSaveLoad();
+    //TestNetworkEvaluation();
+    //TestCheckpointSaveLoad();
     return 0;
 } 

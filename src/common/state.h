@@ -20,6 +20,9 @@ class State {
   // Neural network interface
   virtual torch::Tensor ToTensor() const = 0;
   virtual std::vector<int64_t> GetTensorShape() const = 0;  // Returns expected shape for this game
+
+  // Returns the total number of possible actions for this game
+  virtual int GetActionSpace() const = 0;
 };
 
 #endif  // STATE_H_
