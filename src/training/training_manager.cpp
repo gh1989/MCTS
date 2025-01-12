@@ -9,8 +9,7 @@
 TrainingManager::TrainingManager(const TrainingConfig& config,
                                std::shared_ptr<State> initial_state,
                                std::shared_ptr<ValuePolicyNetwork> network)
-    : config_(config),
-      initial_state_(initial_state),
+    : initial_state_(initial_state),
       arena_(initial_state) {
     std::filesystem::create_directories(config.checkpoint_dir);
     

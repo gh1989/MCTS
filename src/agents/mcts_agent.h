@@ -33,7 +33,7 @@ class MCTSAgent : public Agent {
     // Run search using network for guidance
     mcts.Search([this](const State& state) {
       auto tensor = state.ToTensor();
-      auto [policy, value] = network_->forward(tensor);
+      auto [policy, value] = network_->forward(tensor.to(network_->parameters()[0].device()));
       return std::make_pair(policy.squeeze(), value.squeeze().item<float>());
     });
     
@@ -70,130 +70,113 @@ class MCTSAgent : public Agent {
     network_->train(true);
     
     // Move network to GPU if available
-    torch::Device device(torch::kCUDA);
+    torch::Device device(torch::kCPU);  // Default to CPU
     if (torch::cuda::is_available()) {
+        device = torch::Device(torch::kCUDA);
         network_->to(device);
-        Logger::Log(LogLevel::INFO, "Using GPU for training");
+        Logger::Log(LogLevel::INFO, "Using GPU for training with batch size " + 
+                                   std::to_string(config_.batch_size));
     } else {
-        device = torch::Device(torch::kCPU);
         Logger::Log(LogLevel::INFO, "GPU not available, using CPU");
     }
     
-    torch::optim::Adam optimizer(network_->parameters(), 
-        torch::optim::AdamOptions(config_.learning_rate));
+    // Use AdamW optimizer with weight decay
+    torch::optim::AdamW optimizer(network_->parameters(), 
+        torch::optim::AdamWOptions(config_.learning_rate).weight_decay(0.01));
 
-    // Group moves by game
-    std::vector<std::vector<std::pair<std::shared_ptr<State>, int>>> games;
-    std::vector<std::pair<std::shared_ptr<State>, int>> current_game;
+    // Group all states for batch processing
+    std::vector<torch::Tensor> all_states;
+    std::vector<float> all_outcomes;
+    all_states.reserve(buffer.size());
+    all_outcomes.reserve(buffer.size());
     
-    for (const auto& state_outcome : buffer) {
-        current_game.push_back(state_outcome);
-        if (state_outcome.first->IsTerminal()) {
-            games.push_back(current_game);
-            current_game.clear();
-        }
+    for (const auto& [state, outcome] : buffer) {
+        all_states.push_back(state->ToTensor());
+        all_outcomes.push_back(static_cast<float>(outcome));
     }
-
-    // Training loop
+    
+    // Convert to batched tensor
+    auto states_tensor = torch::stack(all_states).to(device);
+    auto outcomes_tensor = torch::tensor(all_outcomes).to(device);
+    
+    // Training loop with batched processing
     for (int step = 0; step < config_.training_steps; ++step) {
         float total_policy_loss = 0;
         float total_value_loss = 0;
         int num_batches = 0;
 
-        // Process each game
-        for (const auto& game : games) {
-            // Batch all state tensors for value prediction
-            std::vector<torch::Tensor> state_tensors;
-            for (const auto& [state, _] : game) {
-                state_tensors.push_back(state->ToTensor().to(device));
-            }
-            auto states_batch = torch::stack(state_tensors);
+        // Process data in batches
+        for (size_t i = 0; i < buffer.size(); i += config_.batch_size) {
+            size_t batch_end = std::min(i + config_.batch_size, buffer.size());
+            auto states_batch = states_tensor.slice(0, i, batch_end);
+            auto outcomes_batch = outcomes_tensor.slice(0, i, batch_end).unsqueeze(1);
             
-            // Get value predictions in one batch on GPU
-            auto [_, values] = network_->forward(states_batch);
-            std::vector<float> value_predictions;
-            for (int64_t i = 0; i < values.size(0); ++i) {
-                value_predictions.push_back(values[i].item<float>());
-            }
-
-            // Calculate TD(λ) returns for each position
-            std::vector<float> returns(game.size());
-            float final_outcome = game.back().second;
+            // Get MCTS policies in parallel
+            std::vector<torch::Tensor> policies;
+            policies.reserve(batch_end - i);
             
-            // Initialize the last position with the actual outcome
-            returns[game.size() - 1] = final_outcome;
-            
-            // Work backwards through the game
-            for (int i = game.size() - 2; i >= 0; --i) {
-                float bootstrapped_value = config_.discount_factor * value_predictions[i + 1];
-                float td_target = config_.td_lambda * returns[i + 1] + 
-                                (1 - config_.td_lambda) * bootstrapped_value;
-                returns[i] = (i % 2 == game.size() % 2) ? td_target : -td_target;
-            }
-
-            // Process positions in batches
-            for (size_t i = 0; i < game.size(); i += config_.batch_size) {
-                std::vector<torch::Tensor> states, policies;
-                std::vector<float> batch_returns;
-                size_t batch_end = std::min(i + config_.batch_size, game.size());
-
-                for (size_t j = i; j < batch_end; ++j) {
-                    const auto& [state, _] = game[j];
-                    states.push_back(state->ToTensor().to(device));
-                    
-                    // Get MCTS policy for this state
-                    MCTS mcts(config_.simulations_per_move,
-                           [&state]() { return std::unique_ptr<State>(state->Clone()); },
-                           config_.exploration_constant,
-                           config_.temperature);
-                    mcts.Search([this, &device](const State& s) {
-                        auto tensor = s.ToTensor().to(device);
-                        auto [p, v] = network_->forward(tensor);
-                        return std::make_pair(p.squeeze(), v.squeeze().item<float>());
-                    });
-                    
-                    auto visit_counts = mcts.GetVisitCounts();
-                    auto policy = torch::zeros(state->GetActionSpace(), 
-                                            torch::TensorOptions()
-                                              .device(device)
-                                              .dtype(torch::kFloat));
-                    auto valid_actions = state->GetValidActions();
-                    
-                    float total_visits = 0;
-                    for (const auto& count : visit_counts) {
-                        total_visits += count;
-                    }
-                    
-                    for (size_t k = 0; k < visit_counts.size(); ++k) {
-                        float prob = total_visits > 0 ? visit_counts[k] / total_visits : 0.0f;
-                        policy[valid_actions[k]] = prob;
-                    }
-                    policies.push_back(policy);
-                    batch_returns.push_back(returns[j]);
+            #pragma omp parallel for if(config_.batch_size >= 16)
+            for (size_t j = i; j < batch_end; ++j) {
+                const auto& state = buffer[j].first;
+                MCTS mcts(config_.simulations_per_move,
+                       [&state]() { return std::unique_ptr<State>(state->Clone()); },
+                       config_.exploration_constant,
+                       config_.temperature);
+                
+                // Use network for guidance
+                mcts.Search([this, &device](const State& s) {
+                    auto tensor = s.ToTensor().to(device);
+                    auto [p, v] = network_->forward(tensor);
+                    return std::make_pair(p.squeeze(), v.squeeze().item<float>());
+                });
+                
+                auto visit_counts = mcts.GetVisitCounts();
+                auto policy = torch::zeros({state->GetActionSpace()}, 
+                                        torch::TensorOptions()
+                                          .device(device)
+                                          .dtype(torch::kFloat));
+                                          
+                float total_visits = std::accumulate(visit_counts.begin(), 
+                                                   visit_counts.end(), 0.0f);
+                
+                auto valid_actions = state->GetValidActions();
+                for (size_t k = 0; k < visit_counts.size(); ++k) {
+                    float prob = total_visits > 0 ? visit_counts[k] / total_visits : 0.0f;
+                    policy[valid_actions[k]] = prob;
                 }
-
-                auto states_batch = torch::stack(states).to(device);
-                auto policies_batch = torch::stack(policies).to(device);
-                auto values_batch = torch::tensor(batch_returns, device).unsqueeze(1);
-
-                optimizer.zero_grad();
-                auto [policy_output, value_output] = network_->forward(states_batch);
                 
-                auto policy_loss = torch::nn::functional::kl_div(
-                    policy_output,
-                    policies_batch,
-                    torch::nn::functional::KLDivFuncOptions().reduction(torch::kBatchMean)
-                );
-                auto value_loss = torch::nn::functional::mse_loss(
-                    value_output, values_batch);
-                
-                auto total_loss = policy_loss + value_loss;
-                total_loss.backward();
-                optimizer.step();
+                #pragma omp critical
+                policies.push_back(policy);
+            }
+            
+            auto policies_batch = torch::stack(policies);
 
-                total_policy_loss += policy_loss.item().toFloat();
-                total_value_loss += value_loss.item().toFloat();
-                num_batches++;
+            // Forward pass
+            optimizer.zero_grad();
+            auto [policy_output, value_output] = network_->forward(states_batch);
+            
+            // Calculate losses
+            auto policy_loss = torch::nn::functional::kl_div(
+                policy_output,
+                policies_batch,
+                torch::nn::functional::KLDivFuncOptions().reduction(torch::kBatchMean)
+            );
+            auto value_loss = torch::nn::functional::mse_loss(value_output, outcomes_batch);
+            
+            // Combined loss with L2 regularization
+            auto total_loss = policy_loss + value_loss;
+            
+            // Backward pass and optimization
+            total_loss.backward();
+            optimizer.step();
+
+            total_policy_loss += policy_loss.item().toFloat();
+            total_value_loss += value_loss.item().toFloat();
+            num_batches++;
+            
+            // Clear CUDA cache periodically
+            if (device.is_cuda()) {
+                //c10::cuda::CUDACachingAllocator::emptyCache();
             }
         }
 
@@ -207,7 +190,7 @@ class MCTSAgent : public Agent {
         }
     }
 
-    // Before exiting training, move network back to CPU for evaluation
+    // Move network back to CPU for evaluation
     network_->to(torch::kCPU);
     network_->train(false);
   }

@@ -17,10 +17,10 @@ struct TrainingConfig {
     double temperature = 1.0;
     
     // Training parameters
+    int batch_size = 256;
     int num_self_play_games = 1000;
     int games_per_evaluation = 100;
     double required_win_rate = 0.55;
-    int batch_size = 256;
     int training_steps = 1000;
     int log_frequency = 100;
     int total_iterations = 100;

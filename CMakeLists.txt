@@ -4,7 +4,7 @@ project(MCTS)
 # Set the C++ standard and compiler flags
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -g -fopenmp")
 
 # Set Torch directory and find package
 set(Torch_DIR "/opt/libtorch/share/cmake/Torch")
@@ -25,7 +25,7 @@ add_library(mcts_lib
 )
 
 # Link torch to the library and set include directories
-target_link_libraries(mcts_lib "${TORCH_LIBRARIES}")
+target_link_libraries(mcts_lib PRIVATE "${TORCH_LIBRARIES}")
 target_include_directories(mcts_lib PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # State Test
@@ -91,3 +91,8 @@ message(STATUS "Torch libraries: ${TORCH_LIBRARIES}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "Torch version: ${Torch_VERSION}")
 message(STATUS "Torch directory: ${Torch_DIR}")
+
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(mcts_lib PUBLIC OpenMP::OpenMP_CXX)
+endif()

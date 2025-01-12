@@ -32,9 +32,9 @@ private:
     std::shared_ptr<Agent> best_agent_;
     std::shared_ptr<Agent> training_agent_;
     ArenaManager arena_;
+    std::shared_ptr<State> initial_state_;
     
     std::vector<std::pair<std::shared_ptr<State>, int>> self_play_buffer_;
-    std::shared_ptr<State> initial_state_;
 };
 
 #endif  // TRAINING_MANAGER_H_ 
