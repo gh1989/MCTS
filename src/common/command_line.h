@@ -29,6 +29,7 @@ public:
         TryParseInt(args, "--self-play-games", config.num_self_play_games);
         TryParseInt(args, "--eval-games", config.games_per_evaluation);
         TryParseDouble(args, "--required-win-rate", config.required_win_rate);
+        TryParseInt(args, "--total-iterations", config.total_iterations);
         
         // Paths
         TryParseString(args, "--checkpoint-dir", config.checkpoint_dir);

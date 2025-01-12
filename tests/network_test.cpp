@@ -14,7 +14,7 @@ void TestNetworkArchitecture() {
     torch::Tensor input = state.ToTensor();
     
     // Test input shape
-    assert(input.sizes() == torch::IntArrayRef({1, 3, 3, 3}));
+    assert(input.sizes() == torch::IntArrayRef({3, 3, 3}));
     
     // Get network outputs
     auto [policy, value] = network.forward(input);
@@ -82,7 +82,11 @@ void TestNetworkGradients() {
     auto target_value = torch::tensor(0.0f).view({1, 1});  // Draw
     
     // Compute losses
-    auto policy_loss = torch::nn::functional::kl_div(policy, target_policy);
+    auto policy_loss = torch::nn::functional::kl_div(
+        policy, 
+        target_policy,
+        torch::nn::KLDivLossOptions().reduction(torch::kBatchMean)  // Explicitly use batchmean
+    );
     auto value_loss = torch::nn::functional::mse_loss(value, target_value);
     
     auto total_loss = policy_loss + value_loss;

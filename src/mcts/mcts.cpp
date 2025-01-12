@@ -1,5 +1,3 @@
-// Copyright 2024 Your Name / Organization
-
 #include "mcts.h"
 #include "common/state.h"
 #include "common/logger.h"

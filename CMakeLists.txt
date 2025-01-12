@@ -58,6 +58,20 @@ add_executable(TrainingTest tests/training_test.cpp)
 target_link_libraries(TrainingTest mcts_lib "${TORCH_LIBRARIES}")
 target_include_directories(TrainingTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+# Create training executable
+add_executable(TrainTicTacToe 
+    experiments/tic_tac_toe/train.cpp
+)
+target_link_libraries(TrainTicTacToe mcts_lib "${TORCH_LIBRARIES}")
+target_include_directories(TrainTicTacToe PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Add play executable
+add_executable(PlayTicTacToe 
+    experiments/tic_tac_toe/play.cpp
+)
+target_link_libraries(PlayTicTacToe mcts_lib "${TORCH_LIBRARIES}")
+target_include_directories(PlayTicTacToe PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
 # Set output directories for all tests
 set_target_properties(
     StateTest 
@@ -66,6 +80,8 @@ set_target_properties(
     AgentTest 
     ArenaTest 
     TrainingTest
+    TrainTicTacToe
+    PlayTicTacToe
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )

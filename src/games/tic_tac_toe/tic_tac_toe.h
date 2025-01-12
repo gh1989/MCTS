@@ -46,6 +46,10 @@ class TicTacToeState : public State {
     return 9;  // 9 possible actions (3x3 board)
   }
 
+  int GetCurrentPlayer() const override {
+    return current_player_;
+  }
+
  private:
   std::array<int, 9> board_;  // 3x3 board represented as a 1D array
   int current_player_;  // 1 for X, -1 for O

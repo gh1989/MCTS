@@ -23,6 +23,9 @@ class State {
 
   // Returns the total number of possible actions for this game
   virtual int GetActionSpace() const = 0;
+
+  // Returns the current player
+  virtual int GetCurrentPlayer() const = 0;
 };
 
 #endif  // STATE_H_
