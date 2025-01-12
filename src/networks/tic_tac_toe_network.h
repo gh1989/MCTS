@@ -4,6 +4,7 @@
 #include "common/network.h"
 #include <torch/torch.h>
 #include <torch/script.h> 
+
 class TicTacToeNetwork : public ValuePolicyNetwork {
 public:
     TicTacToeNetwork() {

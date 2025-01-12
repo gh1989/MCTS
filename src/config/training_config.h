@@ -23,6 +23,10 @@ struct TrainingConfig {
     int training_steps = 1000;
     int log_frequency = 100;
     
+    // TD Learning parameters
+    double td_lambda = 0.7;
+    double discount_factor = 0.99;
+    
     // File paths
     std::string checkpoint_dir = "checkpoints/";
     std::string log_dir = "logs/";
