@@ -130,7 +130,12 @@ class MCTS {
 
   int GetHighestValueAction() const;
 
+  void AnalyzeActionSequence();
+
  private:
+
+  // mr twister
+  std::mt19937 rng_;
   // Selects the most promising node using UCT.
   std::shared_ptr<Node> Select(std::shared_ptr<Node> node);
 
@@ -163,6 +168,8 @@ class MCTS {
 
   const double exploration_constant_;
   const double temperature_;
+
+  std::vector<int> action_sequence_;
 };
 
 #endif  // MCTS_H_

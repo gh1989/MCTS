@@ -9,7 +9,8 @@
 TrainingManager::TrainingManager(const TrainingConfig& config,
                                std::shared_ptr<State> initial_state,
                                std::shared_ptr<ValuePolicyNetwork> network)
-    : initial_state_(initial_state),
+    : config_(config),
+      initial_state_(initial_state),
       arena_(initial_state) {
     std::filesystem::create_directories(config.checkpoint_dir);
     
@@ -28,6 +29,12 @@ void TrainingManager::RunTrainingIteration() {
     self_play_buffer_.clear();
     
     for (int game = 0; game < config_.num_self_play_games; ++game) {
+        if (game % 10 == 0) {
+            Logger::Log(LogLevel::INFO, "Self-play progress: " + 
+                std::to_string(game) + "/" + 
+                std::to_string(config_.num_self_play_games));
+        }
+        
         auto result = arena_.PlayGame(training_agent_, training_agent_, 
                                     initial_state_, true);
         self_play_buffer_.insert(
@@ -66,19 +73,35 @@ bool TrainingManager::EvaluateNewNetwork() {
     
     int wins = 0, losses = 0, draws = 0;
     
+    // Play games with training agent as both first and second player
     for (int game = 0; game < config_.games_per_evaluation; ++game) {
-        auto result = (game % 2 == 0)
-            ? arena_.PlayGame(training_agent_, best_agent_, initial_state_, false)
-            : arena_.PlayGame(best_agent_, training_agent_, initial_state_, false);
-            
-        if (game % 2 == 1) result.winner = -result.winner;
+        bool training_agent_is_first = (game % 2 == 0);
+        auto result = arena_.PlayGame(
+            training_agent_is_first ? training_agent_ : best_agent_,
+            training_agent_is_first ? best_agent_ : training_agent_,
+            initial_state_, 
+            false
+        );
         
-        if (result.winner == 1) wins++;
-        else if (result.winner == -1) losses++;
-        else draws++;
+        // Adjust result based on who played first
+        int adjusted_result = training_agent_is_first ? result.winner : -result.winner;
+        
+        if (adjusted_result == 1) {
+            wins++;
+            Logger::Log(LogLevel::INFO, "Game " + std::to_string(game) + ": Win");
+        } else if (adjusted_result == -1) {
+            losses++;
+            Logger::Log(LogLevel::INFO, "Game " + std::to_string(game) + ": Loss");
+        } else {
+            draws++;
+            Logger::Log(LogLevel::INFO, "Game " + std::to_string(game) + ": Draw");
+        }
     }
     
     double win_rate = (wins + 0.5 * draws) / config_.games_per_evaluation;
+    Logger::Log(LogLevel::INFO, "Evaluation results - Wins: " + std::to_string(wins) + 
+                               ", Losses: " + std::to_string(losses) + 
+                               ", Draws: " + std::to_string(draws));
     Logger::Log(LogLevel::INFO, "Win rate: " + std::to_string(win_rate));
     
     return win_rate >= config_.required_win_rate;

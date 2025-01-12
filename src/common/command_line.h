@@ -30,10 +30,14 @@ public:
         TryParseInt(args, "--eval-games", config.games_per_evaluation);
         TryParseDouble(args, "--required-win-rate", config.required_win_rate);
         TryParseInt(args, "--total-iterations", config.total_iterations);
+        TryParseInt(args, "--training-steps", config.training_steps);
         
         // Paths
         TryParseString(args, "--checkpoint-dir", config.checkpoint_dir);
         TryParseString(args, "--log-dir", config.log_dir);
+        
+        // Batch size
+        TryParseInt(args, "--batch-size", config.batch_size);
     }
 
 private:
