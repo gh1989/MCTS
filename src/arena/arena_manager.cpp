@@ -1,6 +1,7 @@
 #include "arena/arena_manager.h"
 #include "common/logger.h"
 #include <cmath>
+#include <random>
 
 MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
                                  std::shared_ptr<Agent> player2,
@@ -12,17 +13,24 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
     auto state = std::shared_ptr<State>(initial_state->Clone());
     std::shared_ptr<Agent> current_player = player1;
     
-    // Record initial state if history is enabled
-    if (record_history) {
-        result.game_history.emplace_back(
-            std::shared_ptr<State>(state->Clone()), 
-            1  // First player's perspective
-        );
+    if (!record_history) {
+        Logger::Log(LogLevel::INFO, "\n=== New Game ===");
+        state->Print();  // Print initial state
     }
     
     while (!state->IsTerminal()) {
         int action = current_player->GetAction(state);
+        
+        // Apply the action BEFORE printing the updated state
         state->ApplyAction(action);
+        
+        if (!record_history) {
+            Logger::Log(LogLevel::INFO, 
+                std::string(current_player == player1 ? "Player 1" : "Player 2") + 
+                " plays: " + std::to_string(action));
+            
+            // state->Print();  // Comment out state printing
+        }
         
         if (record_history) {
             result.game_history.emplace_back(
@@ -37,9 +45,16 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
     double final_value = state->Evaluate();
     result.winner = (final_value > 0) ? 1 : (final_value < 0) ? -1 : 0;
     
-    // Record final state if history is enabled
+    if (!record_history) {
+        Logger::Log(LogLevel::INFO, 
+            std::string("Game Result: ") +
+            (result.winner == 1 ? "Player 1 wins" : 
+             result.winner == -1 ? "Player 2 wins" : "Draw"));
+        Logger::Log(LogLevel::INFO, "=== Game End ===\n");
+    }
+    
     if (record_history && !result.game_history.empty()) {
-        result.game_history.back().second = result.winner;  // Update final state with actual outcome
+        result.game_history.back().second = result.winner;
     }
     
     UpdateRatings(result);
@@ -52,6 +67,8 @@ std::vector<MatchResult> ArenaManager::RunTournament(
     int games_per_matchup) {
     
     std::vector<MatchResult> results;
+    std::random_device rd;
+    std::mt19937 gen(rd());
     
     for (size_t i = 0; i < agents.size(); ++i) {
         for (size_t j = i + 1; j < agents.size(); ++j) {
@@ -59,11 +76,20 @@ std::vector<MatchResult> ArenaManager::RunTournament(
                 "Playing matchup " + std::to_string(i) + " vs " + std::to_string(j));
             
             for (int game = 0; game < games_per_matchup; ++game) {
-                auto result = (game % 2 == 0) 
+                // Generate a unique seed for this game
+                unsigned int game_seed = rd();
+                
+                // Set the seed for both agents
+                agents[i]->SetSeed(game_seed);
+                agents[j]->SetSeed(game_seed ^ 0xFFFFFFFF);  // Different but deterministic seed for opponent
+                
+                bool i_plays_first = std::bernoulli_distribution(0.5)(gen);
+                
+                auto result = i_plays_first
                     ? PlayGame(agents[i], agents[j], initial_state, false)
                     : PlayGame(agents[j], agents[i], initial_state, false);
                     
-                if (game % 2 == 1) {
+                if (!i_plays_first) {
                     result.winner = -result.winner;
                 }
                 

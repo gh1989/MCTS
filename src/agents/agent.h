@@ -20,6 +20,9 @@ class Agent {
   
   // Optional: Set whether the agent is in training mode
   virtual void SetTrainingMode([[maybe_unused]] bool is_training) {}
+  
+  // Add this new virtual method
+  virtual void SetSeed([[maybe_unused]] unsigned int seed) {}
 };
 
 #endif  // AGENT_H_ 

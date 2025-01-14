@@ -34,14 +34,16 @@ class MCTSAgent : public Agent {
     mcts.Search([this](const State& state) {
         auto tensor = state.ToTensor();
         auto [policy, value] = network_->forward(tensor.to(network_->parameters()[0].device()));
-        return std::make_pair(policy.squeeze(), value.squeeze().item<float>());
+        // Flip value for player 2's perspective
+        float adjusted_value = state.GetCurrentPlayer() == 1 ? 
+            value.squeeze().item<float>() : -value.squeeze().item<float>();
+        return std::make_pair(policy.squeeze(), adjusted_value);
     });
     
-    // Get action based on visit counts (training) or highest value (evaluation)
+    // Get action based on visit counts (both training and evaluation)
+    auto visit_counts = mcts.GetVisitCounts();
     if (is_training_) {
-        auto visit_counts = mcts.GetVisitCounts();
         if (config_.temperature == 0) {
-            // Deterministic choice of most visited
             return mcts.GetBestAction();
         } else {
             // Sample from visit count distribution with temperature
@@ -73,8 +75,7 @@ class MCTSAgent : public Agent {
             return dist(rng_);
         }
     } else {
-        // In evaluation mode, always choose the highest value move
-        return mcts.GetBestAction();
+        return mcts.GetBestAction();  // Back to deterministic evaluation
     }
   }
 
@@ -86,6 +87,15 @@ class MCTSAgent : public Agent {
     }
     torch::Device device(torch::kCUDA);
     network_->to(device);
+    
+    Logger::Log(LogLevel::INFO, "Starting GPU training with " + 
+                               std::to_string(buffer.size()) + " examples");
+    
+    // Add buffer size check
+    if (buffer.empty()) {
+        Logger::Log(LogLevel::WARNING, "Training buffer is empty, skipping training");
+        return;
+    }
     
     // Convert buffer to tensors first
     std::vector<torch::Tensor> states_vec;
@@ -101,16 +111,11 @@ class MCTSAgent : public Agent {
                                           {static_cast<long>(outcomes_vec.size())},
                                           torch::kFloat).to(device);
     
-    Logger::Log(LogLevel::INFO, "Starting GPU training with " + 
-                               std::to_string(buffer.size()) + " examples");
-    
     // Use the config's training_steps value
     int total_steps = config_.training_steps;
     for (int step = 0; step < total_steps; ++step) {
-        if (step % 5 == 0) {
-            Logger::Log(LogLevel::INFO, "Training step " + std::to_string(step) + 
-                                      "/" + std::to_string(total_steps));
-        }
+        Logger::Log(LogLevel::INFO, "Training step " + std::to_string(step) + 
+                                  "/" + std::to_string(total_steps));
         
         // Process data in batches
         for (size_t i = 0; i < buffer.size(); i += config_.batch_size) {
@@ -125,12 +130,19 @@ class MCTSAgent : public Agent {
             auto policy_loss = torch::zeros({1}, device);
             auto total_loss = value_loss + policy_loss;
             
+            if (step % 10 == 0 && i == 0) {
+                Logger::Log(LogLevel::INFO, "Loss: " + std::to_string(total_loss.item<float>()));
+            }
+            
             total_loss.backward();
             optimizer_.step();
         }
     }
     
-    Logger::Log(LogLevel::INFO, "GPU training completed");
+    Logger::Log(LogLevel::INFO, "GPU training completed successfully");
+    
+    // Move network back to original device
+    network_->to(device_);
   }
 
   void SaveModel(const std::string& filepath) override {
@@ -152,6 +164,10 @@ class MCTSAgent : public Agent {
   std::shared_ptr<ValuePolicyNetwork> CloneNetwork() const {
     auto clone = network_->clone();
     return std::dynamic_pointer_cast<ValuePolicyNetwork>(clone);
+  }
+
+  void SetSeed(unsigned int seed) override {
+    rng_.seed(seed);
   }
 
  private:

@@ -70,28 +70,21 @@ std::shared_ptr<Node> MCTS::Select(std::shared_ptr<Node> node) {
 }
 
 std::shared_ptr<Node> MCTS::SelectBestChild(std::shared_ptr<Node> node) {
+    std::vector<int> valid_actions = GetValidActions(node);
+    std::unordered_set<int> valid_action_set(valid_actions.begin(), valid_actions.end());
+
     double best_value = -std::numeric_limits<double>::infinity();
     std::shared_ptr<Node> best_child = nullptr;
 
     for (const auto& child : node->GetChildren()) {
+        if (valid_action_set.find(child->GetAction()) == valid_action_set.end()) {
+            continue;
+        }
+        
         double uct_value = CalculateUCT(child);
         if (uct_value > best_value) {
             best_value = uct_value;
             best_child = child;
-        }
-    }
-    
-    if (best_child) {
-        action_sequence_.push_back(best_child->GetAction());
-        Logger::Log(LogLevel::DEBUG, "Selected action " + std::to_string(best_child->GetAction()));
-        
-        // Optionally, print full sequence periodically or when it reaches certain length
-        if (action_sequence_.size() % 10 == 0) {  // Every 10 actions
-            std::string sequence = "Action sequence: ";
-            for (int action : action_sequence_) {
-                sequence += std::to_string(action) + " ";
-            }
-            Logger::Log(LogLevel::DEBUG, sequence);
         }
     }
     
@@ -116,11 +109,12 @@ double MCTS::CalculateUCT(std::shared_ptr<Node> node) {
     const double exploration = exploration_constant_ * 
         std::sqrt(std::log(parent_visits) / child_visits);
 
+  /*
     Logger::Log(LogLevel::DEBUG, "UCT for action " + std::to_string(node->GetAction()) + 
                 ": exploitation=" + std::to_string(exploitation) + 
                 ", exploration=" + std::to_string(exploration) + 
                 ", total=" + std::to_string(exploitation + exploration));
-
+  */
     return exploitation + exploration;
 }
 
@@ -186,12 +180,14 @@ int MCTS::GetBestAction() {
     int best_action = NO_ACTION;
     int max_visits = -1;
     
-    Logger::Log(LogLevel::DEBUG, "\nFinal visit counts:");
+    // Logger::Log(LogLevel::DEBUG, "\nFinal visit counts:");
     for (const auto& child : root_->GetChildren()) {
+        /*
         Logger::Log(LogLevel::DEBUG, "Action " + std::to_string(child->GetAction()) + 
                    ": " + std::to_string(child->GetVisitCount()) + " visits, avg value: " + 
                    std::to_string(child->GetVisitCount() > 0 ? 
                    child->GetTotalValue() / child->GetVisitCount() : 0.0));
+        */
         
         if (child->GetVisitCount() > max_visits) {
             max_visits = child->GetVisitCount();
@@ -199,8 +195,10 @@ int MCTS::GetBestAction() {
         }
     }
     
+    /*
     Logger::Log(LogLevel::DEBUG, "Selected action " + std::to_string(best_action) + 
                 " with " + std::to_string(max_visits) + " visits");
+    */
     return best_action;
 }
 
