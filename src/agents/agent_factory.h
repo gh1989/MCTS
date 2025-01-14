@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <stdexcept>
+#include "common/logger.h"
 
 class AgentFactory {
 public:
@@ -16,21 +17,31 @@ public:
         const TrainingConfig& config,
         std::shared_ptr<ValuePolicyNetwork> network = nullptr) {
             
-        if (type == "random") {
-            return std::make_shared<RandomAgent>();
-        }
-        else if (type == "mcts") {
-            if (!network) {
-                throw std::invalid_argument("MCTS agent requires a network");
+        Logger::Log(LogLevel::DEBUG, "Creating agent of type: " + type);
+        
+        try {
+            if (type == "random") {
+                return std::make_shared<RandomAgent>();
             }
-            return std::make_shared<MCTSAgent>(network, config);
-        }
-        else if (type == "mcts_pure") {
-            // Pure MCTS without neural network
-            return std::make_shared<MCTSAgent>(nullptr, config);
-        }
-        else {
+            else if (type == "mcts") {
+                if (!network) {
+                    Logger::Log(LogLevel::ERROR, "MCTS agent requires a network");
+                    throw std::invalid_argument("MCTS agent requires a network");
+                }
+                return std::make_shared<MCTSAgent>(network, config);
+            }
+            else if (type == "mcts_pure") {
+                // Remove pure MCTS option if it's not properly supported
+                Logger::Log(LogLevel::ERROR, "Pure MCTS not currently supported");
+                throw std::invalid_argument("Pure MCTS not currently supported");
+            }
+            
+            Logger::Log(LogLevel::ERROR, "Unknown agent type: " + type);
             throw std::invalid_argument("Unknown agent type: " + type);
+        }
+        catch (const std::exception& e) {
+            Logger::Log(LogLevel::ERROR, "Error creating agent: " + std::string(e.what()));
+            throw; // Re-throw to be handled by caller
         }
     }
 

@@ -27,6 +27,11 @@ class MCTSAgent : public Agent {
         return -1;
     }
 
+    auto valid_actions = state->GetValidActions();
+    if (valid_actions.empty()) {
+        return -1;
+    }
+
     MCTS mcts(config_.simulations_per_move,
               [&state]() { return std::unique_ptr<State>(state->Clone()); });
     
@@ -34,48 +39,72 @@ class MCTSAgent : public Agent {
     mcts.Search([this](const State& state) {
         auto tensor = state.ToTensor();
         auto [policy, value] = network_->forward(tensor.to(network_->parameters()[0].device()));
-        // Flip value for player 2's perspective
         float adjusted_value = state.GetCurrentPlayer() == 1 ? 
             value.squeeze().item<float>() : -value.squeeze().item<float>();
         return std::make_pair(policy.squeeze(), adjusted_value);
     });
     
-    // Get action based on visit counts (both training and evaluation)
+    // Get visit counts
     auto visit_counts = mcts.GetVisitCounts();
-    if (is_training_) {
-        if (config_.temperature == 0) {
-            return mcts.GetBestAction();
-        } else {
-            // Sample from visit count distribution with temperature
-            std::vector<double> probabilities;
-            double sum = 0;
-            for (int count : visit_counts) {
-                double prob = std::pow(count, 1.0 / config_.temperature);
-                probabilities.push_back(prob);
-                sum += prob;
-            }
-            for (double& prob : probabilities) {
-                prob /= sum;
-            }
-            
-            // Add noise during training for exploration
-            if (is_training_) {
-                std::uniform_real_distribution<double> dist(0, 0.1);  // 10% noise
-                for (double& prob : probabilities) {
-                    prob = 0.9 * prob + 0.1 * dist(rng_);
-                }
-                // Renormalize
-                sum = std::accumulate(probabilities.begin(), probabilities.end(), 0.0);
-                for (double& prob : probabilities) {
-                    prob /= sum;
-                }
-            }
-            
-            std::discrete_distribution<> dist(probabilities.begin(), probabilities.end());
-            return dist(rng_);
+    
+    // Filter probabilities to only include valid actions
+    std::vector<double> probabilities(9, 0.0);  // Initialize all to zero
+    double sum = 0.0;
+    
+    for (size_t i = 0; i < visit_counts.size(); ++i) {
+        if (std::find(valid_actions.begin(), valid_actions.end(), i) != valid_actions.end()) {
+            double prob = is_training_ ? 
+                std::pow(visit_counts[i], 1.0 / config_.temperature) : 
+                visit_counts[i];
+            probabilities[i] = prob;
+            sum += prob;
         }
+    }
+    
+    // If no valid moves have visits, select randomly from valid actions
+    if (sum == 0) {
+        std::uniform_int_distribution<> dist(0, valid_actions.size() - 1);
+        return valid_actions[dist(rng_)];
+    }
+    
+    // Normalize probabilities
+    if (sum > 0) {
+        for (double& prob : probabilities) {
+            prob /= sum;
+        }
+    }
+    
+    // Add exploration noise in training mode
+    if (is_training_) {
+        std::uniform_real_distribution<double> dist(0, 0.1);
+        for (size_t i = 0; i < probabilities.size(); ++i) {
+            if (std::find(valid_actions.begin(), valid_actions.end(), i) != valid_actions.end()) {
+                probabilities[i] = 0.9 * probabilities[i] + 0.1 * dist(rng_);
+            }
+        }
+        // Renormalize after adding noise
+        sum = std::accumulate(probabilities.begin(), probabilities.end(), 0.0);
+        for (double& prob : probabilities) {
+            prob /= sum;
+        }
+    }
+    
+    // Select action
+    if (is_training_) {
+        std::discrete_distribution<> dist(probabilities.begin(), probabilities.end());
+        return dist(rng_);
     } else {
-        return mcts.GetBestAction();  // Back to deterministic evaluation
+        // In evaluation mode, select the valid action with highest visit count
+        int best_action = -1;
+        int max_visits = -1;
+        for (size_t i = 0; i < visit_counts.size(); ++i) {
+            if (std::find(valid_actions.begin(), valid_actions.end(), i) != valid_actions.end() &&
+                visit_counts[i] > max_visits) {
+                max_visits = visit_counts[i];
+                best_action = i;
+            }
+        }
+        return best_action;
     }
   }
 
@@ -103,7 +132,10 @@ class MCTSAgent : public Agent {
     
     for (const auto& [state, outcome] : buffer) {
         states_vec.push_back(state->ToTensor().to(device));
-        outcomes_vec.push_back(static_cast<float>(outcome));
+        // Adjust outcome based on player perspective
+        float adjusted_outcome = state->GetCurrentPlayer() == 1 ? 
+            static_cast<float>(outcome) : -static_cast<float>(outcome);
+        outcomes_vec.push_back(adjusted_outcome);
     }
     
     auto states_tensor = torch::stack(states_vec);
@@ -170,10 +202,12 @@ class MCTSAgent : public Agent {
     rng_.seed(seed);
   }
 
+  std::shared_ptr<ValuePolicyNetwork> GetNetwork() const { return network_; }
+
  private:
-  std::shared_ptr<ValuePolicyNetwork> network_;
   const TrainingConfig& config_;
   torch::optim::Adam optimizer_;
+  std::shared_ptr<ValuePolicyNetwork> network_;
   bool is_training_;
   std::mt19937 rng_;
   torch::Device device_{torch::kCPU};  // Default to CPU

@@ -13,37 +13,66 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
     auto state = std::shared_ptr<State>(initial_state->Clone());
     std::shared_ptr<Agent> current_player = player1;
     
-    if (!record_history) {
-        Logger::Log(LogLevel::INFO, "\n=== New Game ===");
-        state->Print();  // Print initial state
+    std::vector<std::pair<std::shared_ptr<State>, int>> temp_history;
+    
+    Logger::Log(LogLevel::DEBUG, "Starting new game with history recording: " + 
+                std::to_string(record_history));
+    
+    // Store initial state if recording
+    if (record_history) {
+        Logger::Log(LogLevel::DEBUG, "Recording initial state");
+        temp_history.emplace_back(std::shared_ptr<State>(state->Clone()), 0);
     }
     
+    if (!record_history) {
+        Logger::Log(LogLevel::INFO, "\n=== New Game ===");
+        state->Print();
+    }
+    
+    int move_count = 0;
     while (!state->IsTerminal()) {
+        Logger::Log(LogLevel::DEBUG, "Move " + std::to_string(move_count) + 
+                   ", Current player: " + std::to_string(state->GetCurrentPlayer()));
+        
+        // Get action
         int action = current_player->GetAction(state);
+        Logger::Log(LogLevel::DEBUG, "Selected action: " + std::to_string(action));
         
-        // Apply the action BEFORE printing the updated state
-        state->ApplyAction(action);
-        
-        if (!record_history) {
-            Logger::Log(LogLevel::INFO, 
-                std::string(current_player == player1 ? "Player 1" : "Player 2") + 
-                " plays: " + std::to_string(action));
-            
-            // state->Print();  // Comment out state printing
+        if (action == -1) {
+            Logger::Log(LogLevel::ERROR, "Invalid action -1 returned by agent");
+            break;
         }
         
+        // Apply action
+        state->ApplyAction(action);
+        move_count++;
+        
+        // Record state AFTER applying action
         if (record_history) {
-            result.game_history.emplace_back(
-                std::shared_ptr<State>(state->Clone()), 
-                current_player == player1 ? 1 : -1
-            );
+            auto state_copy = std::shared_ptr<State>(state->Clone());
+            temp_history.emplace_back(state_copy, 0);
+            Logger::Log(LogLevel::DEBUG, "Recorded state after move " + 
+                       std::to_string(move_count));
+        }
+        
+        if (!record_history) {
+            state->Print();
         }
         
         current_player = (current_player == player1) ? player2 : player1;
     }
     
-    double final_value = state->Evaluate();
-    result.winner = (final_value > 0) ? 1 : (final_value < 0) ? -1 : 0;
+    // Calculate final result
+    result.winner = state->Evaluate();
+    
+    // Update history with final outcomes
+    if (record_history) {
+        for (auto& [stored_state, outcome] : temp_history) {
+            bool is_player_one = stored_state->GetCurrentPlayer() == 1;
+            outcome = is_player_one ? result.winner : -result.winner;
+        }
+        result.game_history = std::move(temp_history);
+    }
     
     if (!record_history) {
         Logger::Log(LogLevel::INFO, 
@@ -53,11 +82,6 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
         Logger::Log(LogLevel::INFO, "=== Game End ===\n");
     }
     
-    if (record_history && !result.game_history.empty()) {
-        result.game_history.back().second = result.winner;
-    }
-    
-    UpdateRatings(result);
     return result;
 }
 

@@ -71,8 +71,90 @@ void TestTicTacToeStateToTensor() {
     Logger::Log(LogLevel::INFO, "TicTacToe state to tensor test passed");
 }
 
+void TestTicTacToeStateTermination() {
+    Logger::Log(LogLevel::TEST, "Starting TicTacToe termination test");
+    
+    TicTacToeState state;
+    
+    // Test 1: Horizontal win
+    state.ApplyAction(0);  // X: top-left
+    state.ApplyAction(3);  // O: middle-left
+    state.ApplyAction(1);  // X: top-middle
+    state.ApplyAction(4);  // O: center
+    state.ApplyAction(2);  // X: top-right
+    
+    if (!state.IsTerminal()) {
+        Logger::Log(LogLevel::ERROR, "Failed to detect horizontal win");
+        state.Print();
+        return;
+    }
+    
+    // Test 2: Vertical win
+    TicTacToeState state2;
+    state2.ApplyAction(0);  // X: top-left
+    state2.ApplyAction(1);  // O: top-middle
+    state2.ApplyAction(3);  // X: middle-left
+    state2.ApplyAction(4);  // O: center
+    state2.ApplyAction(6);  // X: bottom-left
+    
+    if (!state2.IsTerminal()) {
+        Logger::Log(LogLevel::ERROR, "Failed to detect vertical win");
+        state2.Print();
+        return;
+    }
+    
+    // Test 3: Diagonal win
+    TicTacToeState state3;
+    state3.ApplyAction(0);  // X: top-left
+    state3.ApplyAction(1);  // O: top-middle
+    state3.ApplyAction(4);  // X: center
+    state3.ApplyAction(3);  // O: middle-left
+    state3.ApplyAction(8);  // X: bottom-right
+    
+    if (!state3.IsTerminal()) {
+        Logger::Log(LogLevel::ERROR, "Failed to detect diagonal win");
+        state3.Print();
+        return;
+    }
+    
+    // Test 4: Draw game
+    TicTacToeState state4;
+    // X O X
+    // X O O
+    // O X X
+    state4.ApplyAction(0);  // X
+    state4.ApplyAction(1);  // O
+    state4.ApplyAction(2);  // X
+    state4.ApplyAction(4);  // O
+    state4.ApplyAction(3);  // X
+    state4.ApplyAction(5);  // O
+    state4.ApplyAction(7);  // X
+    state4.ApplyAction(6);  // O
+    state4.ApplyAction(8);  // X
+    
+    if (!state4.IsTerminal()) {
+        Logger::Log(LogLevel::ERROR, "Failed to detect draw game");
+        state4.Print();
+        return;
+    }
+    
+    // Test 5: Non-terminal state
+    TicTacToeState state5;
+    state5.ApplyAction(0);  // X: top-left
+    state5.ApplyAction(4);  // O: center
+    
+    if (state5.IsTerminal()) {
+        Logger::Log(LogLevel::ERROR, "Incorrectly detected terminal state");
+        state5.Print();
+        return;
+    }
+    
+    Logger::Log(LogLevel::TEST, "TicTacToe termination test passed");
+}
+
 int main() {
     TestTicTacToeStateInitialization();
     TestTicTacToeStateToTensor();
+    TestTicTacToeStateTermination();
     return 0;
 }

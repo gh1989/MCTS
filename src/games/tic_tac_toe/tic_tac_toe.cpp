@@ -16,12 +16,13 @@ std::vector<int> TicTacToeState::GetValidActions() const {
 }
 
 void TicTacToeState::ApplyAction(int action) {
-  // We are ensuring an upper bound so the NO_ACTION will never be relevant.
-  // Otherwise there is an annoying warning.
-  if (action >= 0 && static_cast<size_t>(action) < board_.size() && board_[action] == 0) {
+    if (action < 0 || action >= 9 || board_[action] != 0) {
+        throw std::invalid_argument("Invalid action: " + std::to_string(action));
+    }
+    
     board_[action] = current_player_;
+    // Switch player after move: 1 -> -1 or -1 -> 1
     current_player_ = -current_player_;
-  }
 }
 
 bool TicTacToeState::IsTerminal() const {

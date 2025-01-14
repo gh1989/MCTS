@@ -1,11 +1,13 @@
 #include "games/tic_tac_toe/tic_tac_toe.h"
 #include "common/logger.h"
 #include "mcts/mcts.h"
+#include <cmath>
+#include <numeric>
 
 void TestMCTSTreeConstruction() {
-    Logger::Log(LogLevel::TEST, "Starting MCTS tree construction test.");
+    Logger::Log(LogLevel::TEST, "Starting MCTS tree construction test");
     auto state_factory = []() { return std::make_unique<TicTacToeState>(); };
-    MCTS mcts(10, state_factory);
+    MCTS mcts(100, state_factory);
 
     // Run the MCTS search
     mcts.Search();
@@ -15,125 +17,144 @@ void TestMCTSTreeConstruction() {
     Logger::Log(LogLevel::TEST, "Root visit count: " + std::to_string(root->GetVisitCount()));
     Logger::Log(LogLevel::TEST, "Root children count: " + std::to_string(root->GetChildren().size()));
 
-    // Check children of the root node
-    for (const auto& child : root->GetChildren()) {
-        Logger::Log(LogLevel::TEST, "Child action: " + std::to_string(child->GetAction()) +
-                                     ", Visit count: " + std::to_string(child->GetVisitCount()));
+    // Verify root properties
+    if (root->GetVisitCount() < 100) {
+        Logger::Log(LogLevel::ERROR, "Root node has insufficient visits");
+        return;
     }
 
-    // Verify that the tree has been expanded
     if (root->GetChildren().empty()) {
-        Logger::Log(LogLevel::ERROR, "Error: Tree was not expanded.");
-    } else {
-        Logger::Log(LogLevel::TEST, "Tree expansion verified.");
+        Logger::Log(LogLevel::ERROR, "Root has no children");
+        return;
     }
+
+    Logger::Log(LogLevel::TEST, "Tree construction test passed");
 }
 
-void TestMCTSTreeExpansion() {
-auto state_factory = []() { return std::make_unique<TicTacToeState>(); };
-    MCTS mcts(10, state_factory);
+void TestMCTSSearchBehavior() {
+    Logger::Log(LogLevel::TEST, "Starting MCTS search behavior test");
+    auto state_factory = []() { return std::make_unique<TicTacToeState>(); };
+    MCTS mcts(100, state_factory);
 
-    // Simulate a game using MCTS
-    while (!mcts.IsTerminal(mcts.GetRoot())) {
+    // Run multiple searches and track statistics
+    std::vector<int> actions;
+    std::vector<double> visit_ratios;
+
+    for (int i = 0; i < 5; i++) {
         mcts.Search();
-        mcts.GetRoot()->PrintTree(mcts.GetRoot());
+        auto root = mcts.GetRoot();
         int action = mcts.GetBestAction();
+        actions.push_back(action);
         
-        // Debugging output
-        Logger::Log(LogLevel::TEST, "MCTS selected action: " + std::to_string(action));
-        mcts.GetRoot()->GetState()->Print();
-
-        mcts.GetRoot()->GetState()->ApplyAction(action);
-
-        // Update the root node to reflect the new state
-        auto new_state = mcts.GetRoot()->GetState()->Clone();
-        auto new_root = std::make_shared<Node>(
-            std::weak_ptr<Node>(),
-            1 - mcts.GetRoot()->GetPlayerToMove(),
-            action,
-            std::move(new_state)
-        );
-        mcts.SetRoot(new_root);
-
-        mcts.GetRoot()->GetState()->Print();
+        // Calculate visit concentration
+        int best_visits = 0;
+        for (const auto& child : root->GetChildren()) {
+            if (child->GetVisitCount() > best_visits) {
+                best_visits = child->GetVisitCount();
+            }
+        }
+        
+        double visit_ratio = static_cast<double>(best_visits) / root->GetVisitCount();
+        visit_ratios.push_back(visit_ratio);
+        
+        Logger::Log(LogLevel::DEBUG, "Search " + std::to_string(i) + 
+                   ": Action=" + std::to_string(action) + 
+                   ", Visit ratio=" + std::to_string(visit_ratio));
     }
 
-    Logger::Log(LogLevel::TEST, "Final state evaluation: " + std::to_string(mcts.GetRoot()->GetState()->Evaluate()));
-    Logger::Log(LogLevel::TEST, "Is terminal: " + std::to_string(mcts.IsTerminal(mcts.GetRoot())));
+    // Check for reasonable visit distribution
+    double avg_ratio = std::accumulate(visit_ratios.begin(), visit_ratios.end(), 0.0) / visit_ratios.size();
+    if (avg_ratio < 0.2 || avg_ratio > 0.8) {
+        Logger::Log(LogLevel::ERROR, "Unusual visit distribution: " + std::to_string(avg_ratio));
+        return;
+    }
+
+    Logger::Log(LogLevel::TEST, "Search behavior test passed");
 }
 
-// Function to recursively check the tree structure
-bool CheckTreeConsistency(const std::shared_ptr<Node>& node) {
-    if (!node) return true;
-
-    // Check children recursively
-    for (const auto& child : node->GetChildren()) {
-        if (!CheckTreeConsistency(child)) {
-            return false;
+void TestMCTSExploration() {
+    Logger::Log(LogLevel::TEST, "Starting MCTS exploration test");
+    auto state_factory = []() { return std::make_unique<TicTacToeState>(); };
+    
+    // Test different exploration constants
+    std::vector<double> exploration_constants = {0.5, 1.4142, 2.0};
+    
+    for (double c : exploration_constants) {
+        MCTS mcts(100, state_factory, c);
+        mcts.Search();
+        
+        auto root = mcts.GetRoot();
+        std::vector<int> visit_counts;
+        
+        for (const auto& child : root->GetChildren()) {
+            visit_counts.push_back(child->GetVisitCount());
+        }
+        
+        // Calculate visit distribution statistics
+        double mean = std::accumulate(visit_counts.begin(), visit_counts.end(), 0.0) / visit_counts.size();
+        double variance = 0.0;
+        for (int count : visit_counts) {
+            variance += (count - mean) * (count - mean);
+        }
+        variance /= visit_counts.size();
+        
+        Logger::Log(LogLevel::DEBUG, "Exploration constant " + std::to_string(c) + 
+                   ": Mean visits=" + std::to_string(mean) + 
+                   ", Variance=" + std::to_string(variance));
+        
+        if (c > 1.5 && variance > mean * mean) {
+            Logger::Log(LogLevel::ERROR, "High exploration constant not producing uniform enough distribution");
+            return;
         }
     }
+    
+    Logger::Log(LogLevel::TEST, "Exploration test passed");
+}
 
-    // In MCTS, a node's visit count should be >= sum of child visits
-    // because the node is visited during selection before expansion
-    int total_child_visits = 0;
-    for (const auto& child : node->GetChildren()) {
-        total_child_visits += child->GetVisitCount();
+void TestMCTSGameplay() {
+    Logger::Log(LogLevel::TEST, "Starting MCTS gameplay test");
+    auto state_factory = []() { return std::make_unique<TicTacToeState>(); };
+    auto state = std::make_unique<TicTacToeState>();
+    std::vector<int> moves;
+    
+    // Play a complete game
+    while (!state->IsTerminal()) {
+        // Create new MCTS instance for current state
+        auto current_factory = [&state]() { 
+            auto new_state = std::make_unique<TicTacToeState>();
+            *new_state = *state;
+            return new_state;
+        };
+        MCTS mcts(100, current_factory);
+        
+        mcts.Search();
+        int action = mcts.GetBestAction();
+        moves.push_back(action);
+        
+        Logger::Log(LogLevel::DEBUG, "Selected action: " + std::to_string(action));
+        state->Print();
+        
+        if (action < 0 || action >= 9) {
+            Logger::Log(LogLevel::ERROR, "Invalid action selected: " + std::to_string(action));
+            return;
+        }
+        
+        state->ApplyAction(action);
     }
     
-    if (node->GetVisitCount() < total_child_visits) {
-        Logger::Log(LogLevel::TEST, "Invalid visit counts at node with action: " 
-            + std::to_string(node->GetAction()) 
-            + " Node visits: " + std::to_string(node->GetVisitCount())
-            + " Sum of child visits: " + std::to_string(total_child_visits));
-        return false;
+    // Verify game completion
+    if (moves.empty() || moves.size() > 9) {
+        Logger::Log(LogLevel::ERROR, "Invalid number of moves: " + std::to_string(moves.size()));
+        return;
     }
-
-    return true;
-}
-
-void TestMCTSTreeExpansionConsistency() {
-    Logger::Log(LogLevel::TEST, "Starting MCTS tree expansion consistency test.");
-    auto state_factory = []() { return std::make_unique<TicTacToeState>(); };
-    MCTS mcts(1, state_factory);
-
-    // Run the MCTS search
-    mcts.Search();
-
-    // Check the tree consistency
-    if (CheckTreeConsistency(mcts.GetRoot())) {
-        Logger::Log(LogLevel::TEST, "Tree expansion consistency test passed.");
-    } else {
-        Logger::Log(LogLevel::ERROR, "Tree expansion consistency test failed.");
-    }
-}
-
-// Function to run a single simulation and log the details
-void TestSingleSimulation() {
-    Logger::Log(LogLevel::TEST, "Starting single simulation test.");
-    auto state_factory = []() { return std::make_unique<TicTacToeState>(); };
-    MCTS mcts(10, state_factory);  // Set simulation count to 1 for a single simulation
-
-    // Run a single MCTS search iteration
-    std::shared_ptr<Node> selected = mcts.Select(mcts.GetRoot());
-    std::shared_ptr<Node> expanded = mcts.Expand(selected);
-    double value = mcts.Simulate(expanded ? expanded : selected);
-    mcts.Backpropagate(expanded ? expanded : selected, value);
-
-    // Log the visit counts and actions
-    std::shared_ptr<Node> current = mcts.GetRoot();
-    while (current) {
-        Logger::Log(LogLevel::TEST, "Node action: " + std::to_string(current->GetAction()) +
-                                    ", Visit count: " + std::to_string(current->GetVisitCount()) +
-                                    ", Total value: " + std::to_string(current->GetTotalValue()));
-        if (current->GetChildren().empty()) break;
-        current = current->GetChildren().front();  // Move to the first child for simplicity
-    }
+    
+    Logger::Log(LogLevel::TEST, "Gameplay test passed with " + std::to_string(moves.size()) + " moves");
 }
 
 int main() {
     TestMCTSTreeConstruction();
-    TestMCTSTreeExpansion();
-    TestMCTSTreeExpansionConsistency();
-    TestSingleSimulation(); 
+    TestMCTSSearchBehavior();
+    TestMCTSExploration();
+    TestMCTSGameplay();
     return 0;
 } 

@@ -5,6 +5,7 @@
 #include "networks/tic_tac_toe_network.h"
 #include <filesystem>
 #include <algorithm>
+#include <chrono>
 
 TrainingManager::TrainingManager(const TrainingConfig& config,
                                std::shared_ptr<State> initial_state,
@@ -14,17 +15,20 @@ TrainingManager::TrainingManager(const TrainingConfig& config,
       arena_(initial_state) {
     std::filesystem::create_directories(config.checkpoint_dir);
     
-    best_agent_ = std::make_shared<MCTSAgent>(
-        std::dynamic_pointer_cast<ValuePolicyNetwork>(network),
-        config
-    );
     training_agent_ = std::make_shared<MCTSAgent>(
-        std::dynamic_pointer_cast<ValuePolicyNetwork>(network->clone()),
-        config
-    );
+        std::dynamic_pointer_cast<ValuePolicyNetwork>(network), 
+        config);
+    best_agent_ = std::make_shared<MCTSAgent>(
+        std::dynamic_pointer_cast<ValuePolicyNetwork>(network->clone()), 
+        config);
+    
+    training_agent_->SetTrainingMode(true);
+    best_agent_->SetTrainingMode(false);
 }
 
 void TrainingManager::RunTrainingIteration() {
+    training_agent_->SetTrainingMode(true);
+    
     Logger::Log(LogLevel::INFO, "Starting self-play phase");
     self_play_buffer_.clear();
     
@@ -35,8 +39,21 @@ void TrainingManager::RunTrainingIteration() {
                 std::to_string(config_.num_self_play_games));
         }
         
+        Logger::Log(LogLevel::DEBUG, "Starting game " + std::to_string(game));
+        auto start_time = std::chrono::steady_clock::now();
+        
         auto result = arena_.PlayGame(training_agent_, training_agent_, 
                                     initial_state_, true);
+        
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(
+            end_time - start_time).count();
+        Logger::Log(LogLevel::DEBUG, "Game " + std::to_string(game) + 
+            " completed in " + std::to_string(duration) + " seconds");
+        
+        Logger::Log(LogLevel::DEBUG, "Game history size: " + 
+            std::to_string(result.game_history.size()));
+        
         self_play_buffer_.insert(
             self_play_buffer_.end(),
             result.game_history.begin(),
@@ -55,20 +72,21 @@ void TrainingManager::RunTrainingIteration() {
     if (EvaluateNewNetwork()) {
         Logger::Log(LogLevel::INFO, "New network accepted as best");
         SaveCheckpoint(config_.checkpoint_dir + "/best_network.pt");
-        best_agent_ = std::make_shared<MCTSAgent>(
-            std::dynamic_pointer_cast<MCTSAgent>(training_agent_)->CloneNetwork(),
-            config_
-        );
+        auto training_mcts = std::dynamic_pointer_cast<MCTSAgent>(training_agent_);
+        auto network = std::dynamic_pointer_cast<ValuePolicyNetwork>(training_mcts->GetNetwork()->clone());
+        best_agent_ = std::make_shared<MCTSAgent>(network, config_);
     } else {
         Logger::Log(LogLevel::INFO, "New network rejected, reverting");
-        training_agent_ = std::make_shared<MCTSAgent>(
-            std::dynamic_pointer_cast<MCTSAgent>(best_agent_)->CloneNetwork(),
-            config_
-        );
+        auto best_mcts = std::dynamic_pointer_cast<MCTSAgent>(best_agent_);
+        auto network = std::dynamic_pointer_cast<ValuePolicyNetwork>(best_mcts->GetNetwork()->clone());
+        training_agent_ = std::make_shared<MCTSAgent>(network, config_);
     }
 }
 
 bool TrainingManager::EvaluateNewNetwork() {
+    training_agent_->SetTrainingMode(false);
+    best_agent_->SetTrainingMode(false);
+    
     Logger::Log(LogLevel::INFO, "Evaluating new network");
     
     int wins = 0, losses = 0, draws = 0;
