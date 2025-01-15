@@ -28,12 +28,13 @@ int main(int argc, char* argv[]) {
     TrainingManager trainer(config, initial_state, network);
     
     // 4. Load existing checkpoint if available
-    std::string checkpoint_path = config.checkpoint_dir + "/best_network.pt";
+    std::string checkpoint_path = config.checkpoint_dir + "/final_network.pt";
     if (std::filesystem::exists(checkpoint_path)) {
         Logger::Log(LogLevel::INFO, "Loading existing checkpoint from: " + checkpoint_path);
         trainer.LoadCheckpoint(checkpoint_path);
     } else {
-        Logger::Log(LogLevel::INFO, "No existing checkpoint found. Starting from scratch.");
+        throw std::runtime_error("No existing checkpoint found. Starting from scratch.");
+        //Logger::Log(LogLevel::INFO, "No existing checkpoint found. Starting from scratch.");
     }
     
     // 5. Training loop

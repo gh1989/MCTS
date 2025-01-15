@@ -77,6 +77,12 @@ add_executable(PureMCTSTicTacToe experiments/tic_tac_toe/pure_mcts.cpp)
 target_link_libraries(PureMCTSTicTacToe mcts_lib "${TORCH_LIBRARIES}")
 target_include_directories(PureMCTSTicTacToe PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+# Pure MCTS Test
+add_executable(TrainedVsRandomTicTacToe experiments/tic_tac_toe/play_vs_random.cpp)
+target_link_libraries(TrainedVsRandomTicTacToe mcts_lib "${TORCH_LIBRARIES}")
+target_include_directories(TrainedVsRandomTicTacToe PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+
 # Set output directories for all tests
 set_target_properties(
     StateTest 
@@ -88,6 +94,7 @@ set_target_properties(
     TrainTicTacToe
     PlayTicTacToe
     PureMCTSTicTacToe
+    TrainedVsRandomTicTacToe
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
