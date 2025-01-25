@@ -32,6 +32,15 @@ void TrainingManager::RunTrainingIteration() {
     Logger::Log(LogLevel::INFO, "Starting self-play phase");
     self_play_buffer_.clear();
     
+    // Create a clone of the training agent for self-play, but set it to evaluation mode
+    auto opponent_agent = std::make_shared<MCTSAgent>(
+        std::dynamic_pointer_cast<ValuePolicyNetwork>(
+            std::dynamic_pointer_cast<MCTSAgent>(training_agent_)->GetNetwork()->clone()
+        ), 
+        config_
+    );
+    opponent_agent->SetTrainingMode(false);  // Set to evaluation mode
+    
     for (int game = 0; game < config_.num_self_play_games; ++game) {
         if (game % 10 == 0) {
             Logger::Log(LogLevel::INFO, "Self-play progress: " + 
@@ -39,10 +48,13 @@ void TrainingManager::RunTrainingIteration() {
                 std::to_string(config_.num_self_play_games));
         }
         
-        Logger::Log(LogLevel::DEBUG, "Starting game " + std::to_string(game));
-        auto start_time = std::chrono::steady_clock::now();
+        // Alternate which agent plays first
+        bool training_agent_first = (game % 2 == 0);
+        auto first_player = training_agent_first ? training_agent_ : opponent_agent;
+        auto second_player = training_agent_first ? opponent_agent : training_agent_;
         
-        auto result = arena_.PlayGame(training_agent_, training_agent_, 
+        auto start_time = std::chrono::steady_clock::now();
+        auto result = arena_.PlayGame(first_player, second_player, 
                                     initial_state_, true);
         
         auto end_time = std::chrono::steady_clock::now();
@@ -59,6 +71,17 @@ void TrainingManager::RunTrainingIteration() {
             result.game_history.begin(),
             result.game_history.end()
         );
+        
+        // Every few games, update the opponent with the latest training agent weights
+        if (game % 10 == 0 && game > 0) {
+            opponent_agent = std::make_shared<MCTSAgent>(
+                std::dynamic_pointer_cast<ValuePolicyNetwork>(
+                    std::dynamic_pointer_cast<MCTSAgent>(training_agent_)->GetNetwork()->clone()
+                ), 
+                config_
+            );
+            opponent_agent->SetTrainingMode(false);  // Keep in evaluation mode
+        }
     }
     
     Logger::Log(LogLevel::INFO, "Training network on " + 

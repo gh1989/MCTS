@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
     }
     
     // Create agents with more simulations
-    config.simulations_per_move = 10000;
+    config.simulations_per_move = 2500;
     Logger::Log(LogLevel::INFO, "Using " + std::to_string(config.simulations_per_move) + 
                 " simulations per move");
     auto mcts_agent = std::make_shared<MCTSAgent>(network, config);
