@@ -10,9 +10,12 @@
 #include <vector>
 #include <memory>
 #include "config/training_config.h"
+#include <functional>
 
 class TrainingManager {
 public:
+    using ProgressCallback = std::function<void(const std::string&, int, int, const std::string&)>;
+    
     TrainingManager(const TrainingConfig& config,
                    std::shared_ptr<State> initial_state,
                    std::shared_ptr<ValuePolicyNetwork> network);
@@ -27,6 +30,8 @@ public:
     void SaveCheckpoint(const std::string& filepath);
     void LoadCheckpoint(const std::string& filepath);
 
+    void SetProgressCallback(ProgressCallback callback) { progress_callback_ = callback; }
+
 private:
     TrainingConfig config_;
     std::shared_ptr<Agent> best_agent_;
@@ -35,6 +40,7 @@ private:
     std::shared_ptr<State> initial_state_;
     
     std::vector<std::pair<std::shared_ptr<State>, int>> self_play_buffer_;
+    ProgressCallback progress_callback_;
 };
 
 #endif  // TRAINING_MANAGER_H_ 

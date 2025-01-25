@@ -29,42 +29,37 @@ TrainingManager::TrainingManager(const TrainingConfig& config,
 void TrainingManager::RunTrainingIteration() {
     training_agent_->SetTrainingMode(true);
     
-    Logger::Log(LogLevel::INFO, "Starting self-play phase");
+    if (progress_callback_) {
+        progress_callback_("Self-play", 0, config_.num_self_play_games, "Starting...");
+    }
+    
     self_play_buffer_.clear();
     
-    // Create a clone of the training agent for self-play, but set it to evaluation mode
     auto opponent_agent = std::make_shared<MCTSAgent>(
         std::dynamic_pointer_cast<ValuePolicyNetwork>(
             std::dynamic_pointer_cast<MCTSAgent>(training_agent_)->GetNetwork()->clone()
         ), 
         config_
     );
-    opponent_agent->SetTrainingMode(false);  // Set to evaluation mode
+    opponent_agent->SetTrainingMode(false);
     
     for (int game = 0; game < config_.num_self_play_games; ++game) {
-        if (game % 10 == 0) {
-            Logger::Log(LogLevel::INFO, "Self-play progress: " + 
-                std::to_string(game) + "/" + 
-                std::to_string(config_.num_self_play_games));
-        }
+        auto start_time = std::chrono::steady_clock::now();
         
-        // Alternate which agent plays first
         bool training_agent_first = (game % 2 == 0);
         auto first_player = training_agent_first ? training_agent_ : opponent_agent;
         auto second_player = training_agent_first ? opponent_agent : training_agent_;
         
-        auto start_time = std::chrono::steady_clock::now();
-        auto result = arena_.PlayGame(first_player, second_player, 
-                                    initial_state_, true);
+        auto result = arena_.PlayGame(first_player, second_player, initial_state_, true);
         
-        auto end_time = std::chrono::steady_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::seconds>(
-            end_time - start_time).count();
-        Logger::Log(LogLevel::DEBUG, "Game " + std::to_string(game) + 
-            " completed in " + std::to_string(duration) + " seconds");
-        
-        Logger::Log(LogLevel::DEBUG, "Game history size: " + 
-            std::to_string(result.game_history.size()));
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start_time).count() / 1000.0;
+            
+        if (progress_callback_) {
+            std::string status = "Game time: " + std::to_string(duration) + "s | ";
+            status += "Buffer size: " + std::to_string(self_play_buffer_.size());
+            progress_callback_("Self-play", game + 1, config_.num_self_play_games, status);
+        }
         
         self_play_buffer_.insert(
             self_play_buffer_.end(),
@@ -72,7 +67,6 @@ void TrainingManager::RunTrainingIteration() {
             result.game_history.end()
         );
         
-        // Every few games, update the opponent with the latest training agent weights
         if (game % 10 == 0 && game > 0) {
             opponent_agent = std::make_shared<MCTSAgent>(
                 std::dynamic_pointer_cast<ValuePolicyNetwork>(
@@ -80,26 +74,36 @@ void TrainingManager::RunTrainingIteration() {
                 ), 
                 config_
             );
-            opponent_agent->SetTrainingMode(false);  // Keep in evaluation mode
+            opponent_agent->SetTrainingMode(false);
         }
     }
     
-    Logger::Log(LogLevel::INFO, "Training network on " + 
-        std::to_string(self_play_buffer_.size()) + " positions");
+    if (progress_callback_) {
+        progress_callback_("Training", 0, 1, 
+            "Training on " + std::to_string(self_play_buffer_.size()) + " positions");
+    }
     
     auto mcts_agent = std::dynamic_pointer_cast<MCTSAgent>(training_agent_);
     if (mcts_agent) {
         mcts_agent->TrainOnBuffer(self_play_buffer_);
     }
     
+    if (progress_callback_) {
+        progress_callback_("Evaluation", 0, config_.games_per_evaluation, "Starting evaluation...");
+    }
+    
     if (EvaluateNewNetwork()) {
-        Logger::Log(LogLevel::INFO, "New network accepted as best");
+        if (progress_callback_) {
+            progress_callback_("Status", 1, 1, "New network accepted as best");
+        }
         SaveCheckpoint(config_.checkpoint_dir + "/best_network.pt");
         auto training_mcts = std::dynamic_pointer_cast<MCTSAgent>(training_agent_);
         auto network = std::dynamic_pointer_cast<ValuePolicyNetwork>(training_mcts->GetNetwork()->clone());
         best_agent_ = std::make_shared<MCTSAgent>(network, config_);
     } else {
-        Logger::Log(LogLevel::INFO, "New network rejected, reverting");
+        if (progress_callback_) {
+            progress_callback_("Status", 1, 1, "Network rejected, reverting to previous best");
+        }
         auto best_mcts = std::dynamic_pointer_cast<MCTSAgent>(best_agent_);
         auto network = std::dynamic_pointer_cast<ValuePolicyNetwork>(best_mcts->GetNetwork()->clone());
         training_agent_ = std::make_shared<MCTSAgent>(network, config_);
@@ -110,11 +114,8 @@ bool TrainingManager::EvaluateNewNetwork() {
     training_agent_->SetTrainingMode(false);
     best_agent_->SetTrainingMode(false);
     
-    Logger::Log(LogLevel::INFO, "Evaluating new network");
-    
     int wins = 0, losses = 0, draws = 0;
     
-    // Play games with training agent as both first and second player
     for (int game = 0; game < config_.games_per_evaluation; ++game) {
         bool training_agent_is_first = (game % 2 == 0);
         auto result = arena_.PlayGame(
@@ -124,27 +125,23 @@ bool TrainingManager::EvaluateNewNetwork() {
             false
         );
         
-        // Adjust result based on who played first
         int adjusted_result = training_agent_is_first ? result.winner : -result.winner;
         
-        if (adjusted_result == 1) {
-            wins++;
-            Logger::Log(LogLevel::INFO, "Game " + std::to_string(game) + ": Win");
-        } else if (adjusted_result == -1) {
-            losses++;
-            Logger::Log(LogLevel::INFO, "Game " + std::to_string(game) + ": Loss");
-        } else {
-            draws++;
-            Logger::Log(LogLevel::INFO, "Game " + std::to_string(game) + ": Draw");
+        if (adjusted_result == 1) wins++;
+        else if (adjusted_result == -1) losses++;
+        else draws++;
+        
+        if (progress_callback_) {
+            std::string status = "W: " + std::to_string(wins) + 
+                               " L: " + std::to_string(losses) + 
+                               " D: " + std::to_string(draws) + 
+                               " | Win rate: " + 
+                               std::to_string((wins + 0.5 * draws) / (game + 1));
+            progress_callback_("Evaluation", game + 1, config_.games_per_evaluation, status);
         }
     }
     
     double win_rate = (wins + 0.5 * draws) / config_.games_per_evaluation;
-    Logger::Log(LogLevel::INFO, "Evaluation results - Wins: " + std::to_string(wins) + 
-                               ", Losses: " + std::to_string(losses) + 
-                               ", Draws: " + std::to_string(draws));
-    Logger::Log(LogLevel::INFO, "Win rate: " + std::to_string(win_rate));
-    
     return win_rate >= config_.required_win_rate;
 }
 

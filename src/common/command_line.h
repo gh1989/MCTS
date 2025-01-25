@@ -9,11 +9,27 @@ class CommandLine {
 public:
     static void ParseArgs(int argc, char* argv[], TrainingConfig& config) {
         std::unordered_map<std::string, std::string> args;
-        for (int i = 1; i < argc; i += 2) {
-            if (i + 1 < argc) {
-                args[argv[i]] = argv[i + 1];
+        
+        // Log received arguments
+        Logger::Log(LogLevel::INFO, "Received arguments:");
+        for (int i = 1; i < argc; i++) {
+            Logger::Log(LogLevel::INFO, std::string(argv[i]));
+        }
+        
+        // Parse into map (looking for key=value format)
+        for (int i = 1; i < argc; i++) {
+            std::string arg = argv[i];
+            size_t equals_pos = arg.find('=');
+            if (equals_pos != std::string::npos) {
+                std::string key = arg.substr(0, equals_pos);
+                std::string value = arg.substr(equals_pos + 1);
+                args[key] = value;
+                Logger::Log(LogLevel::INFO, "Parsed " + key + " = " + value);
             }
         }
+        
+        // Store original values for logging
+        auto original = config;
         
         // Network params
         TryParseInt(args, "--num-filters", config.num_filters);
@@ -38,6 +54,9 @@ public:
         
         // Batch size
         TryParseInt(args, "--batch-size", config.batch_size);
+        
+        // Log changes
+        LogChanges(original, config);
     }
 
 private:
@@ -45,7 +64,14 @@ private:
                            const std::string& key, int& value) {
         auto it = args.find(key);
         if (it != args.end()) {
-            value = std::stoi(it->second);
+            try {
+                int new_value = std::stoi(it->second);
+                Logger::Log(LogLevel::INFO, "Updating " + key + " from " + 
+                          std::to_string(value) + " to " + std::to_string(new_value));
+                value = new_value;
+            } catch (const std::exception& e) {
+                Logger::Log(LogLevel::ERROR, "Failed to parse " + key + ": " + e.what());
+            }
         }
     }
     
@@ -53,7 +79,14 @@ private:
                               const std::string& key, double& value) {
         auto it = args.find(key);
         if (it != args.end()) {
-            value = std::stod(it->second);
+            try {
+                double new_value = std::stod(it->second);
+                Logger::Log(LogLevel::INFO, "Updating " + key + " from " + 
+                          std::to_string(value) + " to " + std::to_string(new_value));
+                value = new_value;
+            } catch (const std::exception& e) {
+                Logger::Log(LogLevel::ERROR, "Failed to parse " + key + ": " + e.what());
+            }
         }
     }
     
@@ -61,8 +94,20 @@ private:
                               const std::string& key, std::string& value) {
         auto it = args.find(key);
         if (it != args.end()) {
+            Logger::Log(LogLevel::INFO, "Updating " + key + " from '" + 
+                       value + "' to '" + it->second + "'");
             value = it->second;
         }
+    }
+    
+    static void LogChanges(const TrainingConfig& original, const TrainingConfig& updated) {
+        Logger::Log(LogLevel::INFO, "Configuration changes:");
+        if (original.num_self_play_games != updated.num_self_play_games) {
+            Logger::Log(LogLevel::INFO, "self_play_games: " + 
+                       std::to_string(original.num_self_play_games) + " -> " + 
+                       std::to_string(updated.num_self_play_games));
+        }
+        // Add similar checks for other parameters
     }
 };
 

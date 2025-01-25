@@ -15,31 +15,17 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
     
     std::vector<std::pair<std::shared_ptr<State>, int>> temp_history;
     
-    Logger::Log(LogLevel::DEBUG, "Starting new game with history recording: " + 
-                std::to_string(record_history));
-    
     // Store initial state if recording
     if (record_history) {
-        Logger::Log(LogLevel::DEBUG, "Recording initial state");
         temp_history.emplace_back(std::shared_ptr<State>(state->Clone()), 0);
-    }
-    
-    if (!record_history) {
-        Logger::Log(LogLevel::INFO, "\n=== New Game ===");
-        state->Print();
     }
     
     int move_count = 0;
     while (!state->IsTerminal()) {
-        Logger::Log(LogLevel::DEBUG, "Move " + std::to_string(move_count) + 
-                   ", Current player: " + std::to_string(state->GetCurrentPlayer()));
-        
         // Get action
         int action = current_player->GetAction(state);
-        Logger::Log(LogLevel::DEBUG, "Selected action: " + std::to_string(action));
         
         if (action == -1) {
-            Logger::Log(LogLevel::ERROR, "Invalid action -1 returned by agent");
             break;
         }
         
@@ -51,12 +37,6 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
         if (record_history) {
             auto state_copy = std::shared_ptr<State>(state->Clone());
             temp_history.emplace_back(state_copy, 0);
-            Logger::Log(LogLevel::DEBUG, "Recorded state after move " + 
-                       std::to_string(move_count));
-        }
-        
-        if (!record_history) {
-            state->Print();
         }
         
         current_player = (current_player == player1) ? player2 : player1;
@@ -72,14 +52,6 @@ MatchResult ArenaManager::PlayGame(std::shared_ptr<Agent> player1,
             outcome = is_player_one ? result.winner : -result.winner;
         }
         result.game_history = std::move(temp_history);
-    }
-    
-    if (!record_history) {
-        Logger::Log(LogLevel::INFO, 
-            std::string("Game Result: ") +
-            (result.winner == 1 ? "Player 1 wins" : 
-             result.winner == -1 ? "Player 2 wins" : "Draw"));
-        Logger::Log(LogLevel::INFO, "=== Game End ===\n");
     }
     
     return result;
