@@ -11,7 +11,7 @@
 #include <memory>
 #include "config/training_config.h"
 #include <functional>
-
+#include "training/replay_buffer.h"
 class TrainingManager {
 public:
     using ProgressCallback = std::function<void(const std::string&, int, int, const std::string&)>;
@@ -33,14 +33,20 @@ public:
     void SetProgressCallback(ProgressCallback callback) { progress_callback_ = callback; }
 
 private:
+    struct EvaluationMetrics {
+        double win_rate;
+        double avg_game_length;
+    };
+    
     TrainingConfig config_;
     std::shared_ptr<Agent> best_agent_;
     std::shared_ptr<Agent> training_agent_;
     ArenaManager arena_;
     std::shared_ptr<State> initial_state_;
     
-    std::vector<std::pair<std::shared_ptr<State>, int>> self_play_buffer_;
+    ReplayBuffer replay_buffer_;
     ProgressCallback progress_callback_;
+    std::vector<EvaluationMetrics> evaluation_history_;
 };
 
 #endif  // TRAINING_MANAGER_H_ 

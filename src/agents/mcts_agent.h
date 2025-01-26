@@ -5,6 +5,7 @@
 #include "mcts/mcts.h"
 #include "common/network.h"
 #include "config/training_config.h"
+#include "training/replay_buffer.h"
 #include "common/logger.h"
 #include <memory>
 #include <torch/torch.h>
@@ -109,7 +110,7 @@ class MCTSAgent : public Agent {
     }
   }
 
-  void TrainOnBuffer(const std::vector<std::pair<std::shared_ptr<State>, int>>& buffer) {
+  void TrainOnBuffer(ReplayBuffer& buffer) {
     network_->train(true);
     
     if (!torch::cuda::is_available()) {
@@ -122,7 +123,7 @@ class MCTSAgent : public Agent {
     std::vector<torch::Tensor> states_vec;
     std::vector<float> outcomes_vec;
     
-    for (const auto& [state, outcome] : buffer) {
+    for (const auto& [state, outcome] : buffer.GetBuffer()) {
         states_vec.push_back(state->ToTensor().to(device));
         float adjusted_outcome = state->GetCurrentPlayer() == 1 ? 
             static_cast<float>(outcome) : -static_cast<float>(outcome);
@@ -130,38 +131,61 @@ class MCTSAgent : public Agent {
     }
     
     auto states_tensor = torch::stack(states_vec);
-    auto outcomes_tensor = torch::from_blob(outcomes_vec.data(), 
-                                          {static_cast<long>(outcomes_vec.size())},
-                                          torch::kFloat).to(device);
+    auto outcomes_tensor = torch::tensor(outcomes_vec, 
+                                     torch::TensorOptions()
+                                         .device(device)
+                                         .dtype(torch::kFloat));
     
-    // Use the config's training_steps value
+    double total_loss = 0.0;
+    double total_policy_loss = 0.0;
+    double total_value_loss = 0.0;
+    int batch_count = 0;
+    
     for (int step = 0; step < config_.training_steps; ++step) {
-        // Process data in batches
-        for (size_t i = 0; i < buffer.size(); i += config_.batch_size) {
-            size_t batch_end = std::min(i + config_.batch_size, buffer.size());
+        for (size_t i = 0; i < buffer.Size(); i += config_.batch_size) {
+            size_t batch_end = std::min(i + config_.batch_size, buffer.Size());
             auto states_batch = states_tensor.slice(0, i, batch_end);
             auto outcomes_batch = outcomes_tensor.slice(0, i, batch_end).unsqueeze(1);
             
             optimizer_.zero_grad();
             auto [policy_output, value_output] = network_->forward(states_batch);
             
+            // Calculate value loss (MSE)
             auto value_loss = torch::mse_loss(value_output, outcomes_batch);
-            auto policy_loss = torch::zeros({1}, device);
-            auto total_loss = value_loss + policy_loss;
             
-            // Single line progress update
-            std::cout << "\rTraining step: " << std::setw(4) << (step + 1) << "/" 
-                      << std::setw(4) << config_.training_steps 
-                      << " (Loss: " << std::fixed << std::setprecision(3) 
-                      << total_loss.item<float>() << ")" << std::flush;
+            // Add L2 regularization
+            auto l2_reg = torch::zeros({1}, device);
+            for (const auto& p : network_->parameters()) {
+                l2_reg += torch::sum(torch::square(p));
+            }
+            
+            auto total_loss = value_loss + config_.l2_reg_weight * l2_reg;
+            
+            total_value_loss += value_loss.item<float>();
+            batch_count++;
             
             total_loss.backward();
             optimizer_.step();
         }
+        
+        // Update learning rate
+        if (step % config_.lr_decay_steps == 0) {
+            double lr = config_.learning_rate * 
+                       std::pow(config_.lr_decay_rate, step / config_.lr_decay_steps);
+            for (auto& group : optimizer_.param_groups()) {
+                group.options().set_lr(lr);
+            }
+        }
+        
+        // Progress update
+        if (step % 10 == 0) {
+            std::cout << "\rStep " << step 
+                     << ": Value Loss = " << (total_value_loss / batch_count) 
+                     << std::flush;
+        }
     }
-    std::cout << std::endl;  // New line after completion
+    std::cout << std::endl;
     
-    // Move network back to original device
     network_->to(device_);
   }
 

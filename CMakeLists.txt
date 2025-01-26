@@ -82,6 +82,21 @@ add_executable(TrainedVsRandomTicTacToe experiments/tic_tac_toe/play_vs_random.c
 target_link_libraries(TrainedVsRandomTicTacToe mcts_lib "${TORCH_LIBRARIES}")
 target_include_directories(TrainedVsRandomTicTacToe PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+# Add the Python folder implementation
+add_executable(tictactoe_py
+    python/tictactoe.cpp
+)
+
+target_link_libraries(tictactoe_py
+    PRIVATE
+    mcts_lib
+    "${TORCH_LIBRARIES}"
+)
+
+target_include_directories(tictactoe_py
+    PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
 
 # Set output directories for all tests
 set_target_properties(
@@ -95,6 +110,7 @@ set_target_properties(
     PlayTicTacToe
     PureMCTSTicTacToe
     TrainedVsRandomTicTacToe
+    tictactoe_py
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )

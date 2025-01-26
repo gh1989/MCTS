@@ -29,9 +29,17 @@ struct TrainingConfig {
     double td_lambda = 0.7;
     double discount_factor = 0.99;
     
+    // Replay buffer size
+    int replay_buffer_size = 10000;
+
     // File paths
     std::string checkpoint_dir = "checkpoints/";
     std::string log_dir = "logs/";
+
+    // Learning rate parameters
+    double l2_reg_weight = 0.0001;
+    double lr_decay_rate = 0.95;
+    int lr_decay_steps = 1000;
 
     // Add this method to log the configuration
     void LogConfig() const {

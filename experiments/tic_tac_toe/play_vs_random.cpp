@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
     
     // Set default model path if not provided or if only directory is provided
     if (config.checkpoint_dir.empty() || config.checkpoint_dir == "checkpoints/") {
-        config.checkpoint_dir = "checkpoints/best_network.pt";
+        config.checkpoint_dir = "checkpoints/final_network.pt";
         Logger::Log(LogLevel::INFO, "Using default checkpoint path: " + config.checkpoint_dir);
     }
     
