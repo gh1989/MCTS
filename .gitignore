@@ -1,2 +1,5 @@
 build/CMakeFiles/BasicTest.dir/build.make
 build
+*.pt
+python/__pycache__/network.cpython-312.pyc
+python/__pycache__/mcts_tictactoe.cpython-312.pyc
