@@ -33,8 +33,12 @@ int main(int argc, char* argv[]) {
         Logger::Log(LogLevel::INFO, "Loading existing checkpoint from: " + checkpoint_path);
         trainer.LoadCheckpoint(checkpoint_path);
     } else {
-        throw std::runtime_error("No existing checkpoint found. Starting from scratch.");
-        //Logger::Log(LogLevel::INFO, "No existing checkpoint found. Starting from scratch.");
+        Logger::Log(LogLevel::INFO, "No existing checkpoint found. Starting from scratch.");
+        // Create checkpoint directory if it doesn't exist
+        if (!std::filesystem::exists(config.checkpoint_dir)) {
+            std::filesystem::create_directories(config.checkpoint_dir);
+            Logger::Log(LogLevel::INFO, "Created checkpoint directory: " + config.checkpoint_dir);
+        }
     }
     
     // 5. Training loop

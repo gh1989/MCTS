@@ -15,8 +15,8 @@ class MCTSAgent : public Agent {
  public:
   MCTSAgent(std::shared_ptr<ValuePolicyNetwork> network,
             const TrainingConfig& config)
-    : network_(network),
-      config_(config),
+    : config_(config),
+      network_(network),
       optimizer_(network->parameters(), config.learning_rate),
       is_training_(false),
       rng_(std::random_device{}()),

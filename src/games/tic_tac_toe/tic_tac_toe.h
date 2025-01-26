@@ -19,27 +19,19 @@ class TicTacToeState : public State {
   }
   void Print() const override;
   torch::Tensor ToTensor() const override {
-    auto tensor = torch::zeros({3, 3, 3});  // [channels, height, width]
+    auto tensor = torch::zeros({1, 3, 3});  // [channels, height, width]
     
     for(int i = 0; i < 9; ++i) {
-      int row = i / 3;
-      int col = i % 3;
-      if(board_[i] == 1) {  // X positions
-        tensor[0][row][col] = 1;
-      } else if(board_[i] == -1) {  // O positions
-        tensor[1][row][col] = 1;
-      }
-    }
-
-    if (current_player_ == 1) {  // X's turn
-      tensor[2].fill_(1);
+        int row = i / 3;
+        int col = i % 3;
+        tensor[0][row][col] = board_[i] * current_player_;
     }
     
     return tensor;
   }
 
   std::vector<int64_t> GetTensorShape() const override {
-    return {3, 3, 3};  // [channels, height, width]
+    return {1, 3, 3};  // [channels, height, width]
   }
 
   int GetActionSpace() const override {

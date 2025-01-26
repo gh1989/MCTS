@@ -17,7 +17,7 @@ int main(int argc, char* argv[]) {
     
     // Set default model path if not provided or if only directory is provided
     if (config.checkpoint_dir.empty() || config.checkpoint_dir == "checkpoints/") {
-        config.checkpoint_dir = "checkpoints/final_network.pt";
+        config.checkpoint_dir = "checkpoints/best_network.pt";
         Logger::Log(LogLevel::INFO, "Using default checkpoint path: " + config.checkpoint_dir);
     }
     
@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
     }
     
     // Create agents with more simulations
-    config.simulations_per_move = 2500;
+    config.simulations_per_move = 200;
     Logger::Log(LogLevel::INFO, "Using " + std::to_string(config.simulations_per_move) + 
                 " simulations per move");
     auto mcts_agent = std::make_shared<MCTSAgent>(network, config);

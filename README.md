@@ -1,3 +1,10 @@
+## MCTS Deep Reinforcement Learning
+
+This is a simple implementation of MCTS Deep Reinforcement Learning for the game of Tic-Tac-Toe.
+Chess was never implemented because it is too complex given the poor performance with Tic-Tac-Toe.
+Project is not finished. It is abandoned.
+Implementation will be rewritten from scratch in Python.
+
 ## Project Structure
 
 - `src/`
