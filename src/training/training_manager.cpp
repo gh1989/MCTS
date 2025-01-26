@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <chrono>
+#include <iomanip>
 
 TrainingManager::TrainingManager(const TrainingConfig& config,
                                std::shared_ptr<State> initial_state,
@@ -29,9 +30,7 @@ TrainingManager::TrainingManager(const TrainingConfig& config,
 void TrainingManager::RunTrainingIteration() {
     training_agent_->SetTrainingMode(true);
     
-    if (progress_callback_) {
-        progress_callback_("Self-play", 0, config_.num_self_play_games, "Starting...");
-    }
+    Logger::Log(LogLevel::INFO, "Self-play games: 0/" + std::to_string(config_.num_self_play_games));
     
     self_play_buffer_.clear();
     
@@ -55,11 +54,10 @@ void TrainingManager::RunTrainingIteration() {
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start_time).count() / 1000.0;
             
-        if (progress_callback_) {
-            std::string status = "Game time: " + std::to_string(duration) + "s | ";
-            status += "Buffer size: " + std::to_string(self_play_buffer_.size());
-            progress_callback_("Self-play", game + 1, config_.num_self_play_games, status);
-        }
+        std::cout << "\rSelf-play games: " << (game + 1) << "/" 
+                  << config_.num_self_play_games << " (Time: " 
+                  << std::fixed << std::setprecision(1) << duration 
+                  << "s, Buffer: " << self_play_buffer_.size() << ")" << std::flush;
         
         self_play_buffer_.insert(
             self_play_buffer_.end(),
@@ -77,33 +75,27 @@ void TrainingManager::RunTrainingIteration() {
             opponent_agent->SetTrainingMode(false);
         }
     }
+    std::cout << std::endl;
     
-    if (progress_callback_) {
-        progress_callback_("Training", 0, 1, 
-            "Training on " + std::to_string(self_play_buffer_.size()) + " positions");
-    }
+    Logger::Log(LogLevel::INFO, "Training on " + std::to_string(self_play_buffer_.size()) + " positions");
     
     auto mcts_agent = std::dynamic_pointer_cast<MCTSAgent>(training_agent_);
     if (mcts_agent) {
         mcts_agent->TrainOnBuffer(self_play_buffer_);
     }
     
-    if (progress_callback_) {
-        progress_callback_("Evaluation", 0, config_.games_per_evaluation, "Starting evaluation...");
-    }
+    Logger::Log(LogLevel::INFO, "Starting evaluation (" + 
+                std::to_string(config_.games_per_evaluation) + " games)...");
     
-    if (EvaluateNewNetwork()) {
-        if (progress_callback_) {
-            progress_callback_("Status", 1, 1, "New network accepted as best");
-        }
+    bool network_accepted = EvaluateNewNetwork();
+    if (network_accepted) {
+        Logger::Log(LogLevel::INFO, "✓ Network ACCEPTED - New best network saved");
         SaveCheckpoint(config_.checkpoint_dir + "/best_network.pt");
         auto training_mcts = std::dynamic_pointer_cast<MCTSAgent>(training_agent_);
         auto network = std::dynamic_pointer_cast<ValuePolicyNetwork>(training_mcts->GetNetwork()->clone());
         best_agent_ = std::make_shared<MCTSAgent>(network, config_);
     } else {
-        if (progress_callback_) {
-            progress_callback_("Status", 1, 1, "Network rejected, reverting to previous best");
-        }
+        Logger::Log(LogLevel::INFO, "✗ Network REJECTED - Reverting to previous best");
         auto best_mcts = std::dynamic_pointer_cast<MCTSAgent>(best_agent_);
         auto network = std::dynamic_pointer_cast<ValuePolicyNetwork>(best_mcts->GetNetwork()->clone());
         training_agent_ = std::make_shared<MCTSAgent>(network, config_);

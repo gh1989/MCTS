@@ -10,6 +10,7 @@
 #include <torch/torch.h>
 #include <random>
 #include <numeric>
+#include <iomanip>
 
 class MCTSAgent : public Agent {
  public:
@@ -117,22 +118,12 @@ class MCTSAgent : public Agent {
     torch::Device device(torch::kCUDA);
     network_->to(device);
     
-    Logger::Log(LogLevel::INFO, "Starting GPU training with " + 
-                               std::to_string(buffer.size()) + " examples");
-    
-    // Add buffer size check
-    if (buffer.empty()) {
-        Logger::Log(LogLevel::WARNING, "Training buffer is empty, skipping training");
-        return;
-    }
-    
     // Convert buffer to tensors first
     std::vector<torch::Tensor> states_vec;
     std::vector<float> outcomes_vec;
     
     for (const auto& [state, outcome] : buffer) {
         states_vec.push_back(state->ToTensor().to(device));
-        // Adjust outcome based on player perspective
         float adjusted_outcome = state->GetCurrentPlayer() == 1 ? 
             static_cast<float>(outcome) : -static_cast<float>(outcome);
         outcomes_vec.push_back(adjusted_outcome);
@@ -144,11 +135,7 @@ class MCTSAgent : public Agent {
                                           torch::kFloat).to(device);
     
     // Use the config's training_steps value
-    int total_steps = config_.training_steps;
-    for (int step = 0; step < total_steps; ++step) {
-        Logger::Log(LogLevel::INFO, "Training step " + std::to_string(step) + 
-                                  "/" + std::to_string(total_steps));
-        
+    for (int step = 0; step < config_.training_steps; ++step) {
         // Process data in batches
         for (size_t i = 0; i < buffer.size(); i += config_.batch_size) {
             size_t batch_end = std::min(i + config_.batch_size, buffer.size());
@@ -162,16 +149,17 @@ class MCTSAgent : public Agent {
             auto policy_loss = torch::zeros({1}, device);
             auto total_loss = value_loss + policy_loss;
             
-            if (step % 10 == 0 && i == 0) {
-                Logger::Log(LogLevel::INFO, "Loss: " + std::to_string(total_loss.item<float>()));
-            }
+            // Single line progress update
+            std::cout << "\rTraining step: " << std::setw(4) << (step + 1) << "/" 
+                      << std::setw(4) << config_.training_steps 
+                      << " (Loss: " << std::fixed << std::setprecision(3) 
+                      << total_loss.item<float>() << ")" << std::flush;
             
             total_loss.backward();
             optimizer_.step();
         }
     }
-    
-    Logger::Log(LogLevel::INFO, "GPU training completed successfully");
+    std::cout << std::endl;  // New line after completion
     
     // Move network back to original device
     network_->to(device_);
